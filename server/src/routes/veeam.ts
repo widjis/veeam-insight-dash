@@ -1,8 +1,10 @@
 import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { VeeamService } from '@/services/VeeamService.js';
+import { MockVeeamService } from '@/services/MockVeeamService.js';
 import { CacheService } from '@/services/CacheService.js';
 import { logger } from '@/utils/logger.js';
+import { config } from '@/config/environment.js';
 import {
   ApiResponse,
   VeeamJobState,
@@ -27,8 +29,15 @@ const veeamLimiter = rateLimit({
 });
 
 // Initialize services
-const veeamService = new VeeamService();
+// Use mock service if Veeam password is not configured
+const veeamService = config.veeamPassword === 'your_veeam_password_here' || !config.veeamPassword 
+  ? new MockVeeamService() 
+  : new VeeamService();
 const cacheService = new CacheService();
+
+if (config.veeamPassword === 'your_veeam_password_here' || !config.veeamPassword) {
+  logger.info('Using MockVeeamService - configure VEEAM_PASSWORD in .env for real Veeam API');
+}
 
 // Cache TTL in seconds
 const CACHE_TTL = {
@@ -46,7 +55,7 @@ async function getCachedOrFetch<T>(
   ttl: number
 ): Promise<T> {
   // Try to get from cache first
-  const cached = cacheService.get<T>(cacheKey);
+  const cached = await cacheService.get<T>(cacheKey);
   if (cached !== null) {
     logger.debug(`Cache hit for key: ${cacheKey}`);
     return cached as T;
@@ -57,7 +66,7 @@ async function getCachedOrFetch<T>(
   const data = await fetchFunction();
   
   // Store in cache
-  cacheService.set(cacheKey, data, ttl);
+  await cacheService.set(cacheKey, data, ttl);
   
   return data;
 }
@@ -98,13 +107,12 @@ router.get('/jobs', veeamLimiter, async (req: Request, res: Response) => {
       CACHE_TTL.jobs
     );
 
-    const response: ApiResponse<VeeamJobState[]> = {
-      success: true,
-      data: jobsResponse.data || [],
-      timestamp: new Date().toISOString(),
-    };
-
-    res.json(response);
+    // jobsResponse is already an ApiResponse, so return it directly
+    if (jobsResponse.success) {
+      res.json(jobsResponse);
+    } else {
+      res.status(500).json(jobsResponse);
+    }
   } catch (error) {
     logger.error('Failed to fetch Veeam jobs:', error);
     const response: ApiResponse<null> = {
@@ -126,6 +134,10 @@ router.get('/jobs/:id', veeamLimiter, async (req: Request, res: Response) => {
       CACHE_TTL.jobs
     );
 
+    if (!jobsResponse.success) {
+      return res.status(500).json(jobsResponse);
+    }
+
     const job = (jobsResponse.data || []).find((j: VeeamJobState) => j.id === id);
     if (!job) {
       const response: ApiResponse<null> = {
@@ -142,15 +154,15 @@ router.get('/jobs/:id', veeamLimiter, async (req: Request, res: Response) => {
       timestamp: new Date().toISOString(),
     };
 
-    return res.json(response);
+    res.json(response);
   } catch (error) {
-    logger.error(`Failed to fetch job ${req.params.id}:`, error);
+    logger.error('Failed to fetch job details:', error);
     const response: ApiResponse<null> = {
       success: false,
       error: 'Failed to fetch job details',
       timestamp: new Date().toISOString(),
     };
-    return res.status(500).json(response);
+    res.status(500).json(response);
   }
 });
 

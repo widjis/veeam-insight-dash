@@ -6,14 +6,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2 } from 'lucide-react';
-import { apiClient } from '@/services/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('admin123');
+  const [password, setPassword] = useState('admin');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -21,16 +22,16 @@ const Login: React.FC = () => {
     setError(null);
 
     try {
-      const response = await apiClient.login({ username, password });
+      const success = await login(username, password);
       
-      if (response.success) {
+      if (success) {
         // Redirect to dashboard
         navigate('/');
       } else {
-        setError(response.error || 'Login failed');
+        setError('Invalid username or password');
       }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'An error occurred during login');
+      setError('An error occurred during login');
     } finally {
       setIsLoading(false);
     }
@@ -91,7 +92,7 @@ const Login: React.FC = () => {
           
           <div className="mt-4 text-sm text-gray-600 text-center">
             <p>Demo credentials:</p>
-            <p>admin / admin123</p>
+            <p>admin / admin</p>
             <p>operator / operator123</p>
             <p>viewer / viewer123</p>
           </div>

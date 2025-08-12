@@ -14,8 +14,9 @@ import { errorHandler } from '@/middleware/errorHandler.js';
 import { authMiddleware } from '@/middleware/auth.js';
 import veeamRoutes from '@/routes/veeam.js';
 import authRoutes from '@/routes/auth.js';
-import dashboardRoutes from '@/routes/dashboard.js';
+import dashboardRoutes, { setServices } from '@/routes/dashboard.js';
 import { VeeamService } from '@/services/VeeamService.js';
+import { MockVeeamService } from '@/services/MockVeeamService.js';
 import { WebSocketService } from '@/services/WebSocketService.js';
 import { CacheService } from '@/services/CacheService.js';
 import { AlertService } from '@/services/AlertService.js';
@@ -91,11 +92,21 @@ app.use('*', (req, res) => {
 app.use(errorHandler);
 
 // Initialize services
-const veeamService = new VeeamService();
+const veeamService = (!config.veeamPassword || config.veeamPassword === 'your_veeam_password_here') 
+  ? new MockVeeamService() 
+  : new VeeamService();
+
+if (veeamService instanceof MockVeeamService) {
+  logger.info('Using MockVeeamService for development');
+}
+
 const wsService = new WebSocketService(server);
 const cacheService = new CacheService();
 const alertService = new AlertService(wsService, cacheService);
 const monitoringService = new MonitoringService(veeamService, wsService, cacheService, alertService);
+
+// Set services for dashboard routes
+setServices(alertService, monitoringService);
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {

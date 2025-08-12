@@ -342,7 +342,8 @@ export class VeeamService {
 
   public async getSessionStates(): Promise<ApiResponse<VeeamSession[]>> {
     try {
-      const response = await this.axiosInstance.get('/api/v1/sessions/states');
+      // Use the regular sessions endpoint instead of states which causes GUID error
+      const response = await this.axiosInstance.get('/api/v1/sessions');
       return {
         success: true,
         data: response.data.data || [],

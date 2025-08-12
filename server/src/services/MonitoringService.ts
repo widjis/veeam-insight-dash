@@ -1,4 +1,5 @@
 import { VeeamService } from './VeeamService.js';
+import { MockVeeamService } from './MockVeeamService.js';
 import { WebSocketService } from './WebSocketService.js';
 import { CacheService } from './CacheService.js';
 import { AlertService } from './AlertService.js';
@@ -17,7 +18,7 @@ import os from 'os';
 import process from 'process';
 
 export class MonitoringService {
-  private veeamService: VeeamService;
+  private veeamService: VeeamService | MockVeeamService;
   private webSocketService: WebSocketService;
   private cacheService: CacheService;
   private alertService: AlertService;
@@ -27,7 +28,7 @@ export class MonitoringService {
   private isRunning = false;
 
   constructor(
-    veeamService: VeeamService,
+    veeamService: VeeamService | MockVeeamService,
     webSocketService: WebSocketService,
     cacheService: CacheService,
     alertService: AlertService
@@ -414,6 +415,67 @@ export class MonitoringService {
   public async forceMonitoringCycle(): Promise<void> {
     logger.info('Forcing monitoring cycle...');
     await this.performMonitoringCycle();
+  }
+
+  public async generateTestAlerts(): Promise<void> {
+    logger.info('Generating test alerts for demonstration...');
+    
+    const testAlerts: Alert[] = [
+      {
+        id: `test-critical-${Date.now()}`,
+        ruleId: 'test-rule',
+        type: 'error',
+        severity: 'critical',
+        title: 'Critical System Alert',
+        message: 'This is a test critical alert to demonstrate real-time notifications.',
+        timestamp: new Date().toISOString(),
+        acknowledged: false,
+        resolved: false,
+        metadata: {
+          testAlert: true,
+          source: 'monitoring-service'
+        }
+      },
+      {
+        id: `test-warning-${Date.now() + 1}`,
+        ruleId: 'test-rule',
+        type: 'warning',
+        severity: 'high',
+        title: 'High Priority Warning',
+        message: 'Test warning alert - backup job may need attention.',
+        timestamp: new Date().toISOString(),
+        acknowledged: false,
+        resolved: false,
+        metadata: {
+          testAlert: true,
+          jobName: 'Exchange-Backup-Daily'
+        }
+      },
+      {
+         id: `test-info-${Date.now() + 2}`,
+         ruleId: 'test-rule',
+         type: 'infrastructure_down',
+         severity: 'medium',
+         title: 'Infrastructure Alert',
+         message: 'Test infrastructure alert - system maintenance scheduled.',
+         timestamp: new Date().toISOString(),
+         acknowledged: false,
+         resolved: false,
+         metadata: {
+           testAlert: true,
+           maintenanceWindow: '2024-01-15 02:00 AM'
+         }
+       }
+    ];
+
+    for (const alert of testAlerts) {
+      await this.alertService.createAlert(alert);
+      await this.cacheService.set(`alert-${alert.id}`, alert, 3600);
+      // Small delay between alerts for better demonstration
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+    
+    logger.info('Test alerts generated successfully');
   }
 
   public async forceHealthCheck(): Promise<HealthCheck | null> {

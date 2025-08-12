@@ -14,31 +14,42 @@ import { useJobs } from "@/hooks/useApi";
 interface JobStatus {
   id: string;
   name: string;
-  status: "Success" | "Failed" | "Warning" | "Running" | "Stopped";
+  type: string;
+  lastResult: "Success" | "Failed" | "Warning" | "None";
   lastRun: string;
-  duration: string;
-  dataProcessed: string;
-  nextRun: string;
+  nextRun?: string;
+  isEnabled: boolean;
+  status: "Running" | "Stopped" | "Idle";
+  message?: string;
+  progress?: number;
 }
 
 
 
-const getStatusBadge = (status: JobStatus["status"]) => {
+const getStatusBadge = (lastResult: JobStatus["lastResult"]) => {
   const variants = {
     Success: { variant: "default" as const, icon: CheckCircle, className: "bg-status-success text-white" },
     Failed: { variant: "destructive" as const, icon: XCircle, className: "bg-status-error text-white" },
     Warning: { variant: "default" as const, icon: AlertTriangle, className: "bg-status-warning text-white" },
-    Running: { variant: "default" as const, icon: Play, className: "bg-status-info text-white animate-pulse" },
-    Stopped: { variant: "secondary" as const, icon: Clock, className: "bg-muted text-muted-foreground" }
+    None: { variant: "secondary" as const, icon: Clock, className: "bg-muted text-muted-foreground" }
   };
 
-  const config = variants[status];
+  const config = variants[lastResult];
+  if (!config) {
+    return (
+      <Badge variant="secondary" className="bg-muted text-muted-foreground">
+        <Clock className="w-3 h-3 mr-1" />
+        {lastResult}
+      </Badge>
+    );
+  }
+  
   const Icon = config.icon;
 
   return (
     <Badge variant={config.variant} className={config.className}>
       <Icon className="w-3 h-3 mr-1" />
-      {status}
+      {lastResult}
     </Badge>
   );
 };
@@ -99,10 +110,10 @@ export const JobStatusTable = () => {
           <TableHeader>
             <TableRow>
               <TableHead>Job Name</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>Last Result</TableHead>
               <TableHead>Last Run</TableHead>
-              <TableHead>Duration</TableHead>
-              <TableHead>Data Processed</TableHead>
+              <TableHead>Type</TableHead>
+              <TableHead>Current Status</TableHead>
               <TableHead>Next Run</TableHead>
             </TableRow>
           </TableHeader>
@@ -117,16 +128,16 @@ export const JobStatusTable = () => {
               jobsData.map((job: JobStatus) => (
                 <TableRow key={job.id} className="hover:bg-muted/50">
                   <TableCell className="font-medium">{job.name}</TableCell>
-                  <TableCell>{getStatusBadge(job.status)}</TableCell>
+                  <TableCell>{getStatusBadge(job.lastResult)}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {job.lastRun}
+                    {new Date(job.lastRun).toLocaleString()}
                   </TableCell>
-                  <TableCell className="text-sm">{job.duration}</TableCell>
+                  <TableCell className="text-sm">{job.type}</TableCell>
                   <TableCell className="text-sm font-medium">
-                    {job.dataProcessed}
+                    {job.status}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">
-                    {job.nextRun}
+                    {job.nextRun ? new Date(job.nextRun).toLocaleString() : 'N/A'}
                   </TableCell>
                 </TableRow>
               ))

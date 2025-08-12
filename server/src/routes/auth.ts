@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
 import { config } from '@/config/environment.js';
 import { logger } from '@/utils/logger.js';
+import { authMiddleware } from '@/middleware/auth.js';
 import {
   User,
   AuthTokens,
@@ -277,7 +278,7 @@ router.post('/logout', async (req: Request, res: Response) => {
  * @desc Get current user information
  * @access Private
  */
-router.get('/me', async (req: Request, res: Response) => {
+router.get('/me', authMiddleware, async (req: Request, res: Response) => {
   try {
     // The user should be attached to req by the auth middleware
     const user = (req as any).user;
@@ -320,7 +321,7 @@ router.get('/me', async (req: Request, res: Response) => {
  * @desc Get all users (admin only)
  * @access Private (Admin)
  */
-router.get('/users', async (req: Request, res: Response) => {
+router.get('/users', authMiddleware, async (req: Request, res: Response) => {
   try {
     const currentUser = (req as any).user;
     

@@ -7,11 +7,12 @@ import { useRepositories } from "@/hooks/useApi";
 interface Repository {
   id: string;
   name: string;
-  type: "primary" | "secondary" | "archive";
-  totalSpace: number;
-  usedSpace: number;
-  freeSpace: number;
-  status: "healthy" | "warning" | "critical";
+  path: string;
+  type: string;
+  capacityGB: number;
+  freeGB: number;
+  usedSpaceGB: number;
+  status: "Available" | "Unavailable" | "Maintenance";
 }
 
 
@@ -19,7 +20,10 @@ interface Repository {
 export const RepositoryChart = () => {
   const { data: repositories, isLoading, error } = useRepositories();
 
-  const formatSize = (sizeInGB: number): string => {
+  const formatSize = (sizeInGB: number | undefined): string => {
+    if (sizeInGB === undefined || sizeInGB === null || isNaN(sizeInGB)) {
+      return '0 GB';
+    }
     if (sizeInGB >= 1024) {
       return `${(sizeInGB / 1024).toFixed(1)} TB`;
     }
@@ -28,11 +32,11 @@ export const RepositoryChart = () => {
 
   const getStatusColor = (status: Repository["status"]) => {
     switch (status) {
-      case "healthy":
+      case "Available":
         return "bg-status-success text-white";
-      case "warning":
+      case "Maintenance":
         return "bg-status-warning text-white";
-      case "critical":
+      case "Unavailable":
         return "bg-status-error text-white";
       default:
         return "bg-muted text-muted-foreground";
@@ -107,7 +111,9 @@ export const RepositoryChart = () => {
           </div>
         ) : (
           repositoriesData.map((repo: Repository) => {
-            const usagePercent = (repo.usedSpace / repo.totalSpace) * 100;
+            const usagePercent = (repo.usedSpaceGB && repo.capacityGB && repo.capacityGB > 0) 
+              ? (repo.usedSpaceGB / repo.capacityGB) * 100 
+              : 0;
             const TypeIcon = getTypeIcon(repo.type);
             
             return (
@@ -118,7 +124,7 @@ export const RepositoryChart = () => {
                     <span className="font-medium">{repo.name}</span>
                   </div>
                   <Badge className={getStatusColor(repo.status)}>
-                    {repo.status === "critical" && <AlertTriangle className="w-3 h-3 mr-1" />}
+                    {repo.status === "Unavailable" && <AlertTriangle className="w-3 h-3 mr-1" />}
                     {repo.status}
                   </Badge>
                 </div>
@@ -130,8 +136,8 @@ export const RepositoryChart = () => {
                     aria-label={`${repo.name} storage usage`}
                   />
                   <div className="flex justify-between text-xs text-muted-foreground">
-                    <span>{formatSize(repo.usedSpace)} used</span>
-                    <span>{formatSize(repo.totalSpace)} total</span>
+                    <span>{formatSize(repo.usedSpaceGB || 0)} used</span>
+                    <span>{formatSize(repo.capacityGB || 0)} total</span>
                   </div>
                 </div>
                 

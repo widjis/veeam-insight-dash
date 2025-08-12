@@ -24,21 +24,25 @@ interface AuthTokens {
 interface JobStatus {
   id: string;
   name: string;
-  status: "Success" | "Failed" | "Warning" | "Running" | "Stopped";
+  type: string;
+  lastResult: "Success" | "Failed" | "Warning" | "None";
   lastRun: string;
-  duration: string;
-  dataProcessed: string;
-  nextRun: string;
+  nextRun?: string;
+  isEnabled: boolean;
+  status: "Running" | "Stopped" | "Idle";
+  message?: string;
+  progress?: number;
 }
 
 interface Repository {
   id: string;
   name: string;
-  type: "primary" | "secondary" | "archive";
-  totalSpace: number;
-  usedSpace: number;
-  freeSpace: number;
-  status: "healthy" | "warning" | "critical";
+  path: string;
+  type: string;
+  capacityGB: number;
+  freeGB: number;
+  usedSpaceGB: number;
+  status: "Available" | "Unavailable" | "Maintenance";
 }
 
 interface ActivityItem {
@@ -138,16 +142,25 @@ class ApiClient {
   // Authentication methods
   async login(credentials: LoginRequest): Promise<ApiResponse<AuthTokens>> {
     try {
-      const response: AxiosResponse<ApiResponse<AuthTokens>> = await this.axiosInstance.post(
+      const response: AxiosResponse<ApiResponse<{ user: any; tokens: AuthTokens }>> = await this.axiosInstance.post(
         '/api/auth/login',
         credentials
       );
       
-      if (response.data.success && response.data.data) {
-        this.saveTokens(response.data.data);
+      if (response.data.success && response.data.data?.tokens) {
+        this.saveTokens(response.data.data.tokens);
+        return {
+          success: true,
+          data: response.data.data.tokens,
+          timestamp: response.data.timestamp,
+        };
       }
       
-      return response.data;
+      return {
+        success: false,
+        error: response.data.error || 'Login failed',
+        timestamp: response.data.timestamp,
+      };
     } catch (error: any) {
       return {
         success: false,
@@ -210,7 +223,7 @@ class ApiClient {
   async getJobs(): Promise<ApiResponse<JobStatus[]>> {
     try {
       const response: AxiosResponse<ApiResponse<JobStatus[]>> = await this.axiosInstance.get(
-        '/api/veeam/jobs/states'
+        '/api/veeam/jobs'
       );
       return response.data;
     } catch (error: any) {
@@ -225,7 +238,7 @@ class ApiClient {
   async getRepositories(): Promise<ApiResponse<Repository[]>> {
     try {
       const response: AxiosResponse<ApiResponse<Repository[]>> = await this.axiosInstance.get(
-        '/api/veeam/repositories/states'
+        '/api/veeam/repositories'
       );
       return response.data;
     } catch (error: any) {
@@ -263,6 +276,21 @@ class ApiClient {
       return {
         success: false,
         error: error.response?.data?.error || 'Health check failed',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async generateTestAlerts(): Promise<ApiResponse<{ message: string }>> {
+    try {
+      const response: AxiosResponse<ApiResponse<{ message: string }>> = await this.axiosInstance.post(
+        '/api/dashboard/test-alerts'
+      );
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to generate test alerts',
         timestamp: new Date().toISOString(),
       };
     }

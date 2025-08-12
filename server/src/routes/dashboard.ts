@@ -35,6 +35,13 @@ const veeamService = new VeeamService();
 const cacheService = new CacheService();
 // We'll initialize AlertService later when WebSocketService is available
 let alertService: AlertService;
+let monitoringService: any; // Will be set from server.ts
+
+// Function to set services from server.ts
+export function setServices(alert: AlertService, monitoring: any) {
+  alertService = alert;
+  monitoringService = monitoring;
+}
 
 // Cache TTL in seconds
 const CACHE_TTL = {
@@ -249,7 +256,71 @@ router.get('/alerts', dashboardLimiter, async (req: Request, res: Response) => {
   }
 });
 
-// GET /api/dashboard/health - Get system health check
+// GET /api/dashboard/health - Get system// Activity endpoint
+router.get('/activity', dashboardLimiter, async (req: Request, res: Response) => {
+  try {
+    const cacheKey = 'dashboard:activity';
+    
+    const cachedActivity = await cacheService.getOrSet(
+      cacheKey,
+      async () => {
+        // Generate mock activity data
+        const mockActivity = [
+          {
+            id: '1',
+            type: 'success' as const,
+            title: 'Backup Job Completed',
+            description: 'Daily backup job completed successfully',
+            timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
+          },
+          {
+            id: '2',
+            type: 'warning' as const,
+            title: 'Repository Space Low',
+            description: 'Repository storage is 85% full',
+            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
+          },
+          {
+            id: '3',
+            type: 'info' as const,
+            title: 'Maintenance Window',
+            description: 'Scheduled maintenance completed',
+            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 6).toISOString(), // 6 hours ago
+          },
+          {
+            id: '4',
+            type: 'error' as const,
+            title: 'Backup Job Failed',
+            description: 'Weekly archive job failed - network timeout',
+            timestamp: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(), // 12 hours ago
+          },
+        ];
+        
+        return mockActivity;
+      },
+      CACHE_TTL.alerts
+    );
+
+    const response: ApiResponse<any[]> = {
+      success: true,
+      data: cachedActivity,
+      timestamp: new Date().toISOString(),
+    };
+
+    res.json(response);
+    logger.info('Dashboard activity data retrieved successfully');
+  } catch (error: any) {
+    logger.error('Error fetching dashboard activity:', error);
+    const response: ApiResponse<any[]> = {
+      success: false,
+      error: 'Failed to fetch dashboard activity',
+      timestamp: new Date().toISOString(),
+    };
+    res.status(500).json(response);
+  }
+});
+
+// Health check endpoint
 router.get('/health', dashboardLimiter, async (req: Request, res: Response) => {
   try {
     const cachedHealth = await cacheService.get<HealthCheck>('dashboard:health');
@@ -330,6 +401,38 @@ router.post('/refresh', dashboardLimiter, async (req: Request, res: Response) =>
     const response: ApiResponse<null> = {
       success: false,
       error: 'Failed to refresh dashboard data',
+      timestamp: new Date().toISOString(),
+    };
+    res.status(500).json(response);
+  }
+});
+
+// POST /api/dashboard/test-alerts - Generate test alerts for demonstration
+router.post('/test-alerts', dashboardLimiter, async (req: Request, res: Response) => {
+  try {
+    if (!monitoringService) {
+      const response: ApiResponse<null> = {
+        success: false,
+        error: 'Monitoring service not available',
+        timestamp: new Date().toISOString(),
+      };
+      return res.status(503).json(response);
+    }
+
+    await monitoringService.generateTestAlerts();
+    
+    const response: ApiResponse<{ message: string }> = {
+      success: true,
+      data: { message: 'Test alerts generated successfully' },
+      timestamp: new Date().toISOString(),
+    };
+    
+    res.json(response);
+  } catch (error) {
+    logger.error('Failed to generate test alerts:', error);
+    const response: ApiResponse<null> = {
+      success: false,
+      error: 'Failed to generate test alerts',
       timestamp: new Date().toISOString(),
     };
     res.status(500).json(response);

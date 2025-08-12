@@ -35,6 +35,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
+import { apiClient } from "@/services/api"
 
 const SettingsSchema = z.object({
   alerts: z.object({
@@ -152,6 +153,30 @@ const Settings = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const handleTestAlerts = async () => {
+    try {
+      const response = await apiClient.generateTestAlerts()
+      if (response.success) {
+        toast({
+          title: "Test Alerts Generated",
+          description: "Check the notification bell for test alerts.",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to generate test alerts",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to generate test alerts",
+        variant: "destructive",
+      })
+    }
+  }
+
   const onSubmit = (values: SettingsValues) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(values))
     toast({ title: "Settings saved", description: "Your preferences have been updated." })
@@ -184,6 +209,7 @@ const Settings = () => {
             <TabsTrigger value="alerts">Alerts</TabsTrigger>
             <TabsTrigger value="reporting">Reporting</TabsTrigger>
             <TabsTrigger value="general">General</TabsTrigger>
+            <TabsTrigger value="testing">Testing</TabsTrigger>
           </TabsList>
 
           <Form {...form}>
@@ -573,6 +599,46 @@ const Settings = () => {
                     </Button>
                     <Button type="submit">Save changes</Button>
                   </CardFooter>
+                </Card>
+              </TabsContent>
+
+              {/* Testing */}
+              <TabsContent value="testing" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Alert Testing</CardTitle>
+                    <CardDescription>
+                      Test the real-time alert notification system by generating sample alerts.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="space-y-4">
+                      <div className="p-4 border rounded-lg bg-muted/50">
+                        <h4 className="font-medium mb-2">Generate Test Alerts</h4>
+                        <p className="text-sm text-muted-foreground mb-4">
+                          This will create sample alerts (critical, warning, and infrastructure) to test the notification system.
+                          Check the notification bell in the header to see the alerts appear in real-time.
+                        </p>
+                        <Button 
+                          type="button" 
+                          onClick={handleTestAlerts}
+                          className="w-full sm:w-auto"
+                        >
+                          Generate Test Alerts
+                        </Button>
+                      </div>
+                      
+                      <div className="p-4 border rounded-lg bg-blue-50 dark:bg-blue-950/20">
+                        <h4 className="font-medium mb-2 text-blue-900 dark:text-blue-100">How it works</h4>
+                        <ul className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
+                          <li>• Alerts appear in real-time via WebSocket connection</li>
+                          <li>• Critical alerts may play sound notifications (if enabled)</li>
+                          <li>• Alerts can be acknowledged or resolved from the notification dropdown</li>
+                          <li>• Test alerts are marked with metadata for identification</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </CardContent>
                 </Card>
               </TabsContent>
 
