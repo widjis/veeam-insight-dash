@@ -8,7 +8,8 @@ import {
   TableHeader, 
   TableRow 
 } from "@/components/ui/table";
-import { Clock, CheckCircle, XCircle, AlertTriangle, Play } from "lucide-react";
+import { Clock, CheckCircle, XCircle, AlertTriangle, Play, Loader2 } from "lucide-react";
+import { useJobs } from "@/hooks/useApi";
 
 interface JobStatus {
   id: string;
@@ -20,44 +21,7 @@ interface JobStatus {
   nextRun: string;
 }
 
-const mockJobs: JobStatus[] = [
-  {
-    id: "1",
-    name: "SQL Server Backup",
-    status: "Success",
-    lastRun: "2024-01-12 02:30:15",
-    duration: "45m 32s",
-    dataProcessed: "2.3 TB",
-    nextRun: "2024-01-13 02:30:00"
-  },
-  {
-    id: "2", 
-    name: "File Server Backup",
-    status: "Running",
-    lastRun: "2024-01-12 03:15:00",
-    duration: "12m 15s",
-    dataProcessed: "890 GB",
-    nextRun: "2024-01-13 03:15:00"
-  },
-  {
-    id: "3",
-    name: "Exchange Backup", 
-    status: "Failed",
-    lastRun: "2024-01-12 01:45:30",
-    duration: "8m 22s",
-    dataProcessed: "0 B",
-    nextRun: "2024-01-13 01:45:00"
-  },
-  {
-    id: "4",
-    name: "VM Infrastructure",
-    status: "Warning",
-    lastRun: "2024-01-12 04:00:00",
-    duration: "1h 25m",
-    dataProcessed: "4.7 TB",
-    nextRun: "2024-01-13 04:00:00"
-  }
-];
+
 
 const getStatusBadge = (status: JobStatus["status"]) => {
   const variants = {
@@ -80,6 +44,48 @@ const getStatusBadge = (status: JobStatus["status"]) => {
 };
 
 export const JobStatusTable = () => {
+  const { data: jobs, isLoading, error } = useJobs();
+
+  if (isLoading) {
+    return (
+      <Card className="shadow-soft">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-primary" />
+            Backup Jobs Status
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <span className="ml-2 text-muted-foreground">Loading jobs...</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="shadow-soft">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-primary" />
+            Backup Jobs Status
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8 text-destructive">
+            <XCircle className="h-6 w-6" />
+            <span className="ml-2">Failed to load jobs data</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const jobsData = jobs?.data || [];
+
   return (
     <Card className="shadow-soft">
       <CardHeader>
@@ -101,22 +107,30 @@ export const JobStatusTable = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {mockJobs.map((job) => (
-              <TableRow key={job.id} className="hover:bg-muted/50">
-                <TableCell className="font-medium">{job.name}</TableCell>
-                <TableCell>{getStatusBadge(job.status)}</TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {job.lastRun}
-                </TableCell>
-                <TableCell className="text-sm">{job.duration}</TableCell>
-                <TableCell className="text-sm font-medium">
-                  {job.dataProcessed}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {job.nextRun}
+            {jobsData.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  No backup jobs found
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              jobsData.map((job: JobStatus) => (
+                <TableRow key={job.id} className="hover:bg-muted/50">
+                  <TableCell className="font-medium">{job.name}</TableCell>
+                  <TableCell>{getStatusBadge(job.status)}</TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {job.lastRun}
+                  </TableCell>
+                  <TableCell className="text-sm">{job.duration}</TableCell>
+                  <TableCell className="text-sm font-medium">
+                    {job.dataProcessed}
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {job.nextRun}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </CardContent>

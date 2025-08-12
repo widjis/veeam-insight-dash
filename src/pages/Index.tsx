@@ -11,11 +11,30 @@ import {
   Clock,
   Activity,
   Database,
-  Server
+  Server,
+  Loader2
 } from "lucide-react";
+import { useDashboardStats, useRepositories } from "@/hooks/useApi";
 import heroImage from "@/assets/veeam-hero.jpg";
 
 const Index = () => {
+  const { data: dashboardStats, isLoading: statsLoading, error: statsError } = useDashboardStats();
+  const { data: repositories, isLoading: reposLoading } = useRepositories();
+
+  // Calculate derived values
+  const stats = dashboardStats?.data;
+  const repositoriesData = repositories?.data || [];
+  const totalRepositories = repositoriesData.length;
+  const usedCapacityTB = stats?.usedCapacityTB || 0;
+  const capacityUsagePercent = stats?.capacityUsagePercent || 0;
+
+  // Determine storage status based on usage percentage
+  const getStorageStatus = (usage: number) => {
+    if (usage >= 90) return "error";
+    if (usage >= 75) return "warning";
+    return "success";
+  };
+
   return (
     <div className="min-h-screen bg-dashboard-bg">
       <Header />
@@ -43,34 +62,57 @@ const Index = () => {
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Status Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <StatusCard
-            title="Active Jobs"
-            value="12"
-            icon={Clock}
-            status="info"
-            trend={{ value: 8, label: "vs last week" }}
-          />
-          <StatusCard
-            title="Successful Backups"
-            value="9"
-            icon={CheckCircle}
-            status="success"
-            trend={{ value: 12, label: "this week" }}
-          />
-          <StatusCard
-            title="Failed Jobs"
-            value="1"
-            icon={XCircle}
-            status="error"
-            trend={{ value: -33, label: "vs last week" }}
-          />
-          <StatusCard
-            title="Storage Used"
-            value="67.2 TB"
-            icon={HardDrive}
-            status="warning"
-            trend={{ value: 15, label: "this month" }}
-          />
+          {statsLoading ? (
+            // Loading state for all cards
+            Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="bg-card border rounded-lg p-6 animate-pulse">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="h-4 bg-muted rounded w-20"></div>
+                  <div className="h-8 w-8 bg-muted rounded"></div>
+                </div>
+                <div className="h-8 bg-muted rounded w-16 mb-2"></div>
+                <div className="h-3 bg-muted rounded w-24"></div>
+              </div>
+            ))
+          ) : statsError ? (
+            // Error state
+            <div className="col-span-full flex items-center justify-center py-8 text-destructive">
+              <XCircle className="h-6 w-6 mr-2" />
+              <span>Failed to load dashboard statistics</span>
+            </div>
+          ) : (
+            // Actual data
+            <>
+              <StatusCard
+                title="Active Jobs"
+                value={stats?.activeJobs?.toString() || "0"}
+                icon={Activity}
+                trend={{ value: 5, label: "+5%" }}
+                status="success"
+              />
+              <StatusCard
+                title="Successful Backups"
+                value={stats?.successfulJobs?.toString() || "0"}
+                icon={CheckCircle}
+                trend={{ value: 2, label: "+2%" }}
+                status="success"
+              />
+              <StatusCard
+                title="Failed Jobs"
+                value={stats?.failedJobs?.toString() || "0"}
+                icon={XCircle}
+                trend={{ value: 1, label: "+1" }}
+                status={stats?.failedJobs && stats.failedJobs > 0 ? "error" : "success"}
+              />
+              <StatusCard
+                title="Storage Used"
+                value={`${usedCapacityTB.toFixed(1)} TB`}
+                icon={HardDrive}
+                trend={{ value: capacityUsagePercent, label: `${capacityUsagePercent.toFixed(1)}%` }}
+                status={getStorageStatus(capacityUsagePercent)}
+              />
+            </>
+          )}
         </div>
 
         {/* Main Content Grid */}
@@ -93,30 +135,45 @@ const Index = () => {
           
           {/* Infrastructure Status */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <StatusCard
-              title="Backup Servers"
-              value="3"
-              icon={Server}
-              status="success"
-            />
-            <StatusCard
-              title="Proxy Servers"
-              value="5"
-              icon={Database}
-              status="success"
-            />
-            <StatusCard
-              title="Repositories"
-              value="8"
-              icon={HardDrive}
-              status="info"
-            />
-            <StatusCard
-              title="License Usage"
-              value="78%"
-              icon={Activity}
-              status="warning"
-            />
+            {reposLoading ? (
+              // Loading state for infrastructure cards
+              Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="bg-card border rounded-lg p-6 animate-pulse">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="h-4 bg-muted rounded w-20"></div>
+                    <div className="h-8 w-8 bg-muted rounded"></div>
+                  </div>
+                  <div className="h-8 bg-muted rounded w-16"></div>
+                </div>
+              ))
+            ) : (
+              <>
+                <StatusCard
+                  title="Total Jobs"
+                  value={stats?.totalJobs?.toString() || "0"}
+                  icon={Server}
+                  status="info"
+                />
+                <StatusCard
+                  title="Warning Jobs"
+                  value={stats?.warningJobs?.toString() || "0"}
+                  icon={AlertTriangle}
+                  status={stats?.warningJobs && stats.warningJobs > 0 ? "warning" : "success"}
+                />
+                <StatusCard
+                  title="Repositories"
+                  value={totalRepositories.toString()}
+                  icon={Database}
+                  status="info"
+                />
+                <StatusCard
+                  title="Capacity Usage"
+                  value={`${capacityUsagePercent.toFixed(1)}%`}
+                  icon={Activity}
+                  status={getStorageStatus(capacityUsagePercent)}
+                />
+              </>
+            )}
           </div>
         </div>
       </div>

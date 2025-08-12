@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
-import { HardDrive, Server, Database } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
+import { Database, HardDrive, Cloud, AlertTriangle, Loader2, XCircle } from "lucide-react";
+import { useRepositories } from "@/hooks/useApi";
 
 interface Repository {
   id: string;
@@ -13,110 +14,132 @@ interface Repository {
   status: "healthy" | "warning" | "critical";
 }
 
-const mockRepositories: Repository[] = [
-  {
-    id: "1",
-    name: "Primary Storage",
-    type: "primary",
-    totalSpace: 10240, // GB
-    usedSpace: 7168,
-    freeSpace: 3072,
-    status: "warning"
-  },
-  {
-    id: "2", 
-    name: "Archive Storage",
-    type: "archive",
-    totalSpace: 25600,
-    usedSpace: 12800,
-    freeSpace: 12800,
-    status: "healthy"
-  },
-  {
-    id: "3",
-    name: "Cloud Repository",
-    type: "secondary",
-    totalSpace: 51200,
-    usedSpace: 45568,
-    freeSpace: 5632,
-    status: "critical"
-  }
-];
 
-const formatSize = (sizeInGB: number): string => {
-  if (sizeInGB >= 1024) {
-    return `${(sizeInGB / 1024).toFixed(1)} TB`;
-  }
-  return `${sizeInGB} GB`;
-};
-
-const getRepositoryIcon = (type: Repository["type"]) => {
-  const iconMap = {
-    primary: HardDrive,
-    secondary: Server,
-    archive: Database
-  };
-  return iconMap[type];
-};
-
-const getStatusColor = (status: Repository["status"], usagePercent: number) => {
-  if (status === "critical" || usagePercent >= 90) return "bg-status-error";
-  if (status === "warning" || usagePercent >= 80) return "bg-status-warning";
-  return "bg-status-success";
-};
 
 export const RepositoryChart = () => {
+  const { data: repositories, isLoading, error } = useRepositories();
+
+  const formatSize = (sizeInGB: number): string => {
+    if (sizeInGB >= 1024) {
+      return `${(sizeInGB / 1024).toFixed(1)} TB`;
+    }
+    return `${sizeInGB.toFixed(0)} GB`;
+  };
+
+  const getStatusColor = (status: Repository["status"]) => {
+    switch (status) {
+      case "healthy":
+        return "bg-status-success text-white";
+      case "warning":
+        return "bg-status-warning text-white";
+      case "critical":
+        return "bg-status-error text-white";
+      default:
+        return "bg-muted text-muted-foreground";
+    }
+  };
+
+  const getTypeIcon = (type: Repository["type"]) => {
+    switch (type) {
+      case "primary":
+        return Database;
+      case "archive":
+        return HardDrive;
+      case "secondary":
+        return Cloud;
+      default:
+        return Database;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card className="shadow-soft">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5 text-primary" />
+            Storage Repositories
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <span className="ml-2 text-muted-foreground">Loading repositories...</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="shadow-soft">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5 text-primary" />
+            Storage Repositories
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8 text-destructive">
+            <XCircle className="h-6 w-6" />
+            <span className="ml-2">Failed to load repository data</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const repositoriesData = repositories?.data || [];
+
   return (
     <Card className="shadow-soft">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <HardDrive className="h-5 w-5 text-primary" />
+          <Database className="h-5 w-5 text-primary" />
           Storage Repositories
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {mockRepositories.map((repo) => {
-          const usagePercent = Math.round((repo.usedSpace / repo.totalSpace) * 100);
-          const Icon = getRepositoryIcon(repo.type);
-          
-          return (
-            <div key={repo.id} className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <Icon className="h-4 w-4 text-primary" />
+      <CardContent className="space-y-4">
+        {repositoriesData.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            No storage repositories found
+          </div>
+        ) : (
+          repositoriesData.map((repo: Repository) => {
+            const usagePercent = (repo.usedSpace / repo.totalSpace) * 100;
+            const TypeIcon = getTypeIcon(repo.type);
+            
+            return (
+              <div key={repo.id} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TypeIcon className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">{repo.name}</span>
                   </div>
-                  <div>
-                    <h3 className="font-medium">{repo.name}</h3>
-                    <p className="text-sm text-muted-foreground capitalize">
-                      {repo.type} repository
-                    </p>
+                  <Badge className={getStatusColor(repo.status)}>
+                    {repo.status === "critical" && <AlertTriangle className="w-3 h-3 mr-1" />}
+                    {repo.status}
+                  </Badge>
+                </div>
+                
+                <div className="space-y-2">
+                  <Progress 
+                    value={usagePercent} 
+                    className="h-2"
+                    aria-label={`${repo.name} storage usage`}
+                  />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{formatSize(repo.usedSpace)} used</span>
+                    <span>{formatSize(repo.totalSpace)} total</span>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm font-medium">{usagePercent}% used</div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatSize(repo.freeSpace)} free
-                  </div>
-                </div>
+                
+                <div className="pt-2 border-b last:border-b-0 border-border/50"></div>
               </div>
-              
-              <div className="space-y-2">
-                <Progress 
-                  value={usagePercent} 
-                  className="h-2"
-                  aria-label={`${repo.name} storage usage`}
-                />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{formatSize(repo.usedSpace)} used</span>
-                  <span>{formatSize(repo.totalSpace)} total</span>
-                </div>
-              </div>
-              
-              <div className="pt-2 border-b last:border-b-0 border-border/50"></div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </CardContent>
     </Card>
   );
