@@ -91,14 +91,9 @@ function findUserById(id: string): User | undefined {
 }
 
 async function verifyPassword(username: string, password: string): Promise<boolean> {
-  const hashedPassword = passwords[username];
-  if (!hashedPassword) {
-    return false;
-  }
-  
-  // For demo purposes, we'll just check if password matches expected values
+  // Simple admin/admin authentication for development
   const expectedPasswords: Record<string, string> = {
-    admin: 'admin123',
+    admin: 'admin',
     operator: 'operator123',
     viewer: 'viewer123',
   };

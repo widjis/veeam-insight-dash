@@ -74,7 +74,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// API Routes
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/veeam', authMiddleware, veeamRoutes);
 app.use('/api/dashboard', authMiddleware, dashboardRoutes);

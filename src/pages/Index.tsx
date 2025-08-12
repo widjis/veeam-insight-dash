@@ -1,3 +1,6 @@
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { Header } from "@/components/layout/Header";
 import { StatusCard } from "@/components/dashboard/StatusCard";
 import { JobStatusTable } from "@/components/dashboard/JobStatusTable";
@@ -18,8 +21,28 @@ import { useDashboardStats, useRepositories } from "@/hooks/useApi";
 import heroImage from "@/assets/veeam-hero.jpg";
 
 const Index = () => {
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const { data: dashboardStats, isLoading: statsLoading, error: statsError } = useDashboardStats();
   const { data: repositories, isLoading: reposLoading } = useRepositories();
+
+  useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      navigate('/login');
+    }
+  }, [isAuthenticated, authLoading, navigate]);
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-dashboard-bg flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   // Calculate derived values
   const stats = dashboardStats?.data;

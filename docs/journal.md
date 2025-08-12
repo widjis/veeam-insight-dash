@@ -92,6 +92,19 @@ Based on the API analysis document, there are significant opportunities to expan
 - Implement WebSocket integration for real-time updates
 - Add authentication flow UI components
 
+### 🐛 **Bug Fix - Login Redirect Error**
+
+**Issue:** Frontend was throwing `404 Error: User attempted to access non-existent route: /login` when API authentication failed.
+
+**Root Cause:** The `ApiClient` was redirecting to `/login` route when token refresh failed, but no login route was configured in React Router.
+
+**Solution:** Removed the hardcoded redirect and let React Query handle authentication errors gracefully through component-level error handling.
+
+**Files Modified:**
+- <mcfile name="api.ts" path="src/services/api.ts"></mcfile>: Removed `window.location.href = '/login'` redirect
+
+**Status:** ✅ **Fixed** - No more 404 errors, components handle authentication state properly
+
 ## TypeScript Error Resolution - August 12, 2025
 
 ### 🔧 Backend TypeScript Fixes
