@@ -238,6 +238,9 @@ export class AlertService {
       // Broadcast update
       this.webSocketService.broadcastAlertUpdate(alert);
 
+      // Send webhook notifications
+      await this.sendWebhookNotifications(alert, 'alert.acknowledged');
+
       logger.info(`Alert acknowledged: ${alertId} by ${acknowledgedBy}`);
       
       return {
@@ -291,6 +294,9 @@ export class AlertService {
 
       // Broadcast update
       this.webSocketService.broadcastAlertUpdate(alert);
+
+      // Send webhook notifications
+      await this.sendWebhookNotifications(alert, 'alert.resolved');
 
       logger.info(`Alert resolved: ${alertId}${resolvedBy ? ` by ${resolvedBy}` : ''}`);
       
@@ -420,13 +426,149 @@ export class AlertService {
   }
 
   private async sendWhatsAppNotification(alert: Alert): Promise<void> {
-    // TODO: Implement WhatsApp notification using MCP server
-    logger.info(`WhatsApp notification would be sent for alert: ${alert.id}`);
+    try {
+      // Format WhatsApp message
+      const message = this.formatWhatsAppMessage(alert);
+      
+      // Get WhatsApp recipients from config or alert rule
+      const rule = this.alertRules.get(alert.ruleId);
+      const recipients = rule?.actions.whatsappRecipients || config.whatsappDefaultRecipients;
+      
+      if (!recipients || recipients.length === 0) {
+        logger.warn(`No WhatsApp recipients configured for alert: ${alert.id}`);
+        return;
+      }
+
+      // Send to each recipient
+      for (const recipient of recipients) {
+        try {
+          const normalizedNumber = this.normalizePhoneNumber(recipient.trim());
+          
+          // Use direct WhatsApp API endpoint
+          const response = await fetch(`${config.whatsappApiUrl}/send-message`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(config.whatsappApiToken && { 'Authorization': `Bearer ${config.whatsappApiToken}` })
+              },
+            body: JSON.stringify({
+              to: normalizedNumber,
+              message: message
+            }),
+            signal: AbortSignal.timeout(10000) // 10 second timeout
+          });
+
+          if (!response.ok) {
+            throw new Error(`WhatsApp API error: ${response.status} ${response.statusText}`);
+          }
+
+          logger.info(`WhatsApp notification sent successfully to ${normalizedNumber} for alert: ${alert.id}`);
+        } catch (error) {
+          logger.error(`Failed to send WhatsApp notification to ${recipient}:`, error);
+        }
+      }
+    } catch (error) {
+      logger.error(`Failed to send WhatsApp notifications for alert ${alert.id}:`, error);
+      // Don't throw error to prevent alert operation from failing
+    }
   }
 
-  private async sendWebhookNotification(alert: Alert, webhookUrl: string): Promise<void> {
-    // TODO: Implement webhook notification
-    logger.info(`Webhook notification would be sent to ${webhookUrl} for alert: ${alert.id}`);
+  private formatWhatsAppMessage(alert: Alert): string {
+    const severityEmoji = {
+      'critical': '🚨',
+      'high': '⚠️',
+      'medium': '⚡',
+      'low': 'ℹ️'
+    }[alert.severity] || '📢';
+
+    const typeEmoji = {
+      'job_failure': '❌',
+      'storage_threshold': '💾',
+      'infrastructure_down': '🔴',
+      'long_running_job': '⏰',
+      'error': '🚫',
+      'warning': '⚠️'
+    }[alert.type] || '📋';
+
+    return `${severityEmoji} *Veeam Alert*\n\n` +
+           `${typeEmoji} *${alert.title}*\n\n` +
+           `📝 ${alert.message}\n\n` +
+           `🔹 Severity: ${alert.severity.toUpperCase()}\n` +
+           `🔹 Type: ${alert.type.replace('_', ' ').toUpperCase()}\n` +
+           `🔹 Time: ${new Date(alert.timestamp).toLocaleString()}\n\n` +
+           `_Alert ID: ${alert.id}_`;
+  }
+
+  private normalizePhoneNumber(phoneNumber: string): string {
+    // Remove all non-digit characters
+    const digits = phoneNumber.replace(/\D/g, '');
+    
+    // If starts with 0, replace with country code (assuming Indonesia +62)
+    if (digits.startsWith('0')) {
+      return '62' + digits.substring(1);
+    }
+    
+    // If doesn't start with country code, add Indonesia country code
+    if (!digits.startsWith('62')) {
+      return '62' + digits;
+    }
+    
+    return digits;
+  }
+
+  private async sendWebhookNotification(alert: Alert, webhookUrl: string, eventType: 'alert.created' | 'alert.acknowledged' | 'alert.resolved' = 'alert.created'): Promise<void> {
+    try {
+      const webhookPayload = {
+        event: eventType,
+        timestamp: new Date().toISOString(),
+        alert: {
+          id: alert.id,
+          ruleId: alert.ruleId,
+          type: alert.type,
+          severity: alert.severity,
+          title: alert.title,
+          message: alert.message,
+          timestamp: alert.timestamp,
+          acknowledged: alert.acknowledged,
+          acknowledgedBy: alert.acknowledgedBy,
+          acknowledgedAt: alert.acknowledgedAt,
+          resolved: alert.resolved,
+          resolvedAt: alert.resolvedAt,
+          metadata: alert.metadata
+        },
+        source: {
+          system: 'veeam-insight-dash',
+          version: '1.0.0',
+          environment: process.env.NODE_ENV || 'development'
+        }
+      };
+
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Veeam-Insight-Dashboard/1.0.0'
+        },
+        body: JSON.stringify(webhookPayload),
+        signal: AbortSignal.timeout(10000) // 10 second timeout
+      });
+
+      if (!response.ok) {
+        throw new Error(`Webhook request failed: ${response.status} ${response.statusText}`);
+      }
+
+      logger.info(`Webhook notification sent successfully to ${webhookUrl} for alert: ${alert.id} (${eventType})`);
+    } catch (error) {
+      logger.error(`Failed to send webhook notification to ${webhookUrl}:`, error);
+      // Don't throw error to prevent alert operation from failing
+    }
+  }
+
+  private async sendWebhookNotifications(alert: Alert, eventType: 'alert.created' | 'alert.acknowledged' | 'alert.resolved'): Promise<void> {
+    const rule = this.alertRules.get(alert.ruleId);
+    if (rule?.actions.webhook) {
+      await this.sendWebhookNotification(alert, rule.actions.webhook, eventType);
+    }
   }
 
   public async getAlertStats(): Promise<{

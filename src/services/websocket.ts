@@ -1,4 +1,4 @@
-import { io, Socket } from 'socket.io-client';
+import io, { Socket } from 'socket.io-client';
 
 interface Alert {
   id: string;
@@ -83,7 +83,7 @@ type WebSocketEventHandlers = {
 };
 
 class WebSocketService {
-  private socket: Socket | null = null;
+  private socket: typeof Socket | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;

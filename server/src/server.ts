@@ -15,6 +15,7 @@ import { authMiddleware } from '@/middleware/auth.js';
 import veeamRoutes from '@/routes/veeam.js';
 import authRoutes from '@/routes/auth.js';
 import dashboardRoutes, { setServices } from '@/routes/dashboard.js';
+import settingsRoutes from '@/routes/settings.js';
 import { VeeamService } from '@/services/VeeamService.js';
 import { MockVeeamService } from '@/services/MockVeeamService.js';
 import { WebSocketService } from '@/services/WebSocketService.js';
@@ -79,6 +80,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/veeam', authMiddleware, veeamRoutes);
 app.use('/api/dashboard', authMiddleware, dashboardRoutes);
+app.use('/api/settings', authMiddleware, settingsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

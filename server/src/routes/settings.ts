@@ -1,0 +1,481 @@
+import { Router, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
+import fs from 'fs/promises';
+import path from 'path';
+import { body, validationResult } from 'express-validator';
+import { authMiddleware } from '@/middleware/auth.js';
+import { logger } from '@/utils/logger.js';
+import { config } from '@/config/environment.js';
+import { ApiResponse } from '@/types/index.js';
+import axios from 'axios';
+
+const router = Router();
+
+// Rate limiting for settings endpoints
+const settingsLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 minutes
+  max: 10, // Limit each IP to 10 requests per 5 minutes
+  message: {
+    success: false,
+    error: 'Too many settings requests, please try again later.',
+    timestamp: new Date().toISOString(),
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// WhatsApp API URLs
+const WHATSAPP_GROUP_URL = 'http://10.60.10.59:8192/send-group-message';
+const WHATSAPP_PERSONAL_URL = 'http://10.60.10.59:8192/send-message';
+
+// Interface for settings update
+interface SettingsUpdateRequest {
+  whatsappApiUrl?: string;
+  whatsappApiToken?: string;
+  whatsappChatId?: string;
+  whatsappEnabled?: boolean;
+  whatsappDefaultRecipients?: string[];
+  veeamBaseUrl?: string;
+  veeamUsername?: string;
+  veeamPassword?: string;
+  veeamVerifySSL?: boolean;
+}
+
+// Interface for WhatsApp message
+interface WhatsAppMessageRequest {
+  number?: string;
+  chatId?: string;
+  message: string;
+  imageUrl?: string;
+}
+
+// Helper function to update .env file
+async function updateEnvFile(updates: Record<string, string>): Promise<void> {
+  const envPath = path.join(process.cwd(), '.env');
+  
+  try {
+    // Read current .env file
+    let envContent = '';
+    try {
+      envContent = await fs.readFile(envPath, 'utf-8');
+    } catch (error) {
+      // File doesn't exist, create new content
+      logger.info('.env file not found, creating new one');
+    }
+
+    // Parse existing environment variables
+    const envLines = envContent.split('\n');
+    const envMap = new Map<string, string>();
+    const comments: string[] = [];
+
+    envLines.forEach(line => {
+      const trimmedLine = line.trim();
+      if (trimmedLine.startsWith('#') || trimmedLine === '') {
+        comments.push(line);
+      } else if (trimmedLine.includes('=')) {
+        const [key, ...valueParts] = trimmedLine.split('=');
+        envMap.set(key.trim(), valueParts.join('='));
+      }
+    });
+
+    // Update with new values
+    Object.entries(updates).forEach(([key, value]) => {
+      envMap.set(key, value);
+    });
+
+    // Rebuild .env content
+    const newEnvContent = [
+      '# Veeam Insight Dashboard Configuration',
+      '# Server Configuration',
+      `PORT=${envMap.get('PORT') || '3001'}`,
+      `NODE_ENV=${envMap.get('NODE_ENV') || 'development'}`,
+      `CORS_ORIGIN=${envMap.get('CORS_ORIGIN') || 'http://localhost:8080'}`,
+      '',
+      '# Veeam API Configuration',
+      `VEEAM_BASE_URL=${envMap.get('VEEAM_BASE_URL') || 'https://10.60.10.128:9419'}`,
+      `VEEAM_API_VERSION=${envMap.get('VEEAM_API_VERSION') || '1.1-rev1'}`,
+      `VEEAM_USERNAME=${envMap.get('VEEAM_USERNAME') || 'admin.it'}`,
+      `VEEAM_PASSWORD=${envMap.get('VEEAM_PASSWORD') || ''}`,
+      `VEEAM_VERIFY_SSL=${envMap.get('VEEAM_VERIFY_SSL') || 'false'}`,
+      '',
+      '# Authentication',
+      `JWT_SECRET=${envMap.get('JWT_SECRET') || 'your-super-secret-jwt-key-change-in-production'}`,
+      `JWT_EXPIRES_IN=${envMap.get('JWT_EXPIRES_IN') || '24h'}`,
+      `JWT_REFRESH_SECRET=${envMap.get('JWT_REFRESH_SECRET') || 'your-super-secret-refresh-key-change-in-production'}`,
+      `JWT_REFRESH_EXPIRES_IN=${envMap.get('JWT_REFRESH_EXPIRES_IN') || '7d'}`,
+      `REFRESH_TOKEN_EXPIRES_IN=${envMap.get('REFRESH_TOKEN_EXPIRES_IN') || '7d'}`,
+      '',
+      '# Cache Configuration',
+      `CACHE_TTL=${envMap.get('CACHE_TTL') || '300'}`,
+      `CACHE_CHECK_PERIOD=${envMap.get('CACHE_CHECK_PERIOD') || '600'}`,
+      '',
+      '# Rate Limiting',
+      `RATE_LIMIT_WINDOW_MS=${envMap.get('RATE_LIMIT_WINDOW_MS') || '900000'}`,
+      `RATE_LIMIT_MAX_REQUESTS=${envMap.get('RATE_LIMIT_MAX_REQUESTS') || '100'}`,
+      '',
+      '# Logging',
+      `LOG_LEVEL=${envMap.get('LOG_LEVEL') || 'info'}`,
+      `LOG_FILE=${envMap.get('LOG_FILE') || 'logs/app.log'}`,
+      '',
+      '# WebSocket Configuration',
+      `WS_PORT=${envMap.get('WS_PORT') || '3002'}`,
+      '',
+      '# Monitoring Configuration',
+      `MONITORING_INTERVAL=${envMap.get('MONITORING_INTERVAL') || '30000'}`,
+      `ALERT_CHECK_INTERVAL=${envMap.get('ALERT_CHECK_INTERVAL') || '60000'}`,
+      `HEALTH_CHECK_INTERVAL=${envMap.get('HEALTH_CHECK_INTERVAL') || '30'}`,
+      `METRICS_INTERVAL=${envMap.get('METRICS_INTERVAL') || '60'}`,
+      '',
+      '# WhatsApp Integration (Optional)',
+      `WHATSAPP_API_URL=${envMap.get('WHATSAPP_API_URL') || 'http://10.60.10.59:8192'}`,
+      `WHATSAPP_API_TOKEN=${envMap.get('WHATSAPP_API_TOKEN') || ''}`,
+      `WHATSAPP_CHAT_ID=${envMap.get('WHATSAPP_CHAT_ID') || '120363123402010871@g.us'}`,
+      `WHATSAPP_ENABLED=${envMap.get('WHATSAPP_ENABLED') || 'false'}`,
+      `WHATSAPP_DEFAULT_RECIPIENTS=${envMap.get('WHATSAPP_DEFAULT_RECIPIENTS') || ''}`,
+      '',
+      '# Database (Future use)',
+      '# DATABASE_URL=postgresql://user:password@localhost:5432/veeam_dashboard',
+      '',
+      '# Email Configuration (Future use)',
+      '# EMAIL_HOST=smtp.gmail.com',
+      '# EMAIL_PORT=587',
+      '# EMAIL_USER=your-email@gmail.com',
+      '# EMAIL_PASS=your-app-password'
+    ].join('\n');
+
+    // Write updated .env file
+    await fs.writeFile(envPath, newEnvContent, 'utf-8');
+    logger.info('Environment file updated successfully');
+  } catch (error) {
+    logger.error('Error updating .env file:', error);
+    throw new Error('Failed to update environment configuration');
+  }
+}
+
+// Helper function to format phone number
+function phoneNumberFormatter(number: string): string {
+  // Remove all non-numeric characters
+  let formatted = number.replace(/\D/g, '');
+  
+  // Add country code if not present
+  if (formatted.startsWith('0')) {
+    formatted = '62' + formatted.substring(1);
+  } else if (!formatted.startsWith('62')) {
+    formatted = '62' + formatted;
+  }
+  
+  return formatted + '@c.us';
+}
+
+// Get current settings
+router.get('/', authMiddleware, settingsLimiter, async (req: Request, res: Response) => {
+  try {
+    const response: ApiResponse<any> = {
+      success: true,
+      data: {
+        whatsappApiUrl: config.whatsappApiUrl,
+        whatsappChatId: config.whatsappChatId,
+        whatsappEnabled: config.whatsappEnabled,
+        whatsappDefaultRecipients: config.whatsappDefaultRecipients,
+        veeamBaseUrl: config.veeamBaseUrl,
+        veeamUsername: config.veeamUsername,
+        veeamVerifySSL: config.veeamVerifySSL,
+        // Don't expose sensitive data
+        hasWhatsappToken: !!config.whatsappApiToken,
+        hasVeeamPassword: !!config.veeamPassword,
+      },
+      timestamp: new Date().toISOString(),
+    };
+
+    res.json(response);
+  } catch (error) {
+    logger.error('Error fetching settings:', error);
+    const response: ApiResponse<null> = {
+      success: false,
+      error: 'Failed to fetch settings',
+      timestamp: new Date().toISOString(),
+    };
+    res.status(500).json(response);
+  }
+});
+
+// Update settings
+router.put('/', 
+  authMiddleware, 
+  settingsLimiter,
+  [
+    body('whatsappApiUrl').optional().isURL().withMessage('Invalid WhatsApp API URL'),
+    body('whatsappApiToken').optional().isString().withMessage('WhatsApp API token must be a string'),
+    body('whatsappChatId').optional().isString().withMessage('WhatsApp chat ID must be a string'),
+    body('whatsappEnabled').optional().isBoolean().withMessage('WhatsApp enabled must be a boolean'),
+    body('whatsappDefaultRecipients').optional().isArray().withMessage('WhatsApp recipients must be an array'),
+    body('veeamBaseUrl').optional().isURL().withMessage('Invalid Veeam base URL'),
+    body('veeamUsername').optional().isString().withMessage('Veeam username must be a string'),
+    body('veeamPassword').optional().isString().withMessage('Veeam password must be a string'),
+    body('veeamVerifySSL').optional().isBoolean().withMessage('Veeam verify SSL must be a boolean'),
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      // Validate request
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: 'Validation failed',
+          timestamp: new Date().toISOString(),
+        };
+        return res.status(400).json(response);
+      }
+
+      const updates: SettingsUpdateRequest = req.body;
+      const envUpdates: Record<string, string> = {};
+
+      // Map settings to environment variables
+      if (updates.whatsappApiUrl !== undefined) {
+        envUpdates.WHATSAPP_API_URL = updates.whatsappApiUrl;
+      }
+      if (updates.whatsappApiToken !== undefined) {
+        envUpdates.WHATSAPP_API_TOKEN = updates.whatsappApiToken;
+      }
+      if (updates.whatsappChatId !== undefined) {
+        envUpdates.WHATSAPP_CHAT_ID = updates.whatsappChatId;
+      }
+      if (updates.whatsappEnabled !== undefined) {
+        envUpdates.WHATSAPP_ENABLED = updates.whatsappEnabled.toString();
+      }
+      if (updates.whatsappDefaultRecipients !== undefined) {
+        envUpdates.WHATSAPP_DEFAULT_RECIPIENTS = updates.whatsappDefaultRecipients.join(',');
+      }
+      if (updates.veeamBaseUrl !== undefined) {
+        envUpdates.VEEAM_BASE_URL = updates.veeamBaseUrl;
+      }
+      if (updates.veeamUsername !== undefined) {
+        envUpdates.VEEAM_USERNAME = updates.veeamUsername;
+      }
+      if (updates.veeamPassword !== undefined) {
+        envUpdates.VEEAM_PASSWORD = updates.veeamPassword;
+      }
+      if (updates.veeamVerifySSL !== undefined) {
+        envUpdates.VEEAM_VERIFY_SSL = updates.veeamVerifySSL.toString();
+      }
+
+      // Update .env file
+      await updateEnvFile(envUpdates);
+
+      const response: ApiResponse<{ message: string }> = {
+        success: true,
+        data: { message: 'Settings updated successfully. Please restart the server for changes to take effect.' },
+        timestamp: new Date().toISOString(),
+      };
+
+      res.json(response);
+    } catch (error) {
+      logger.error('Error updating settings:', error);
+      const response: ApiResponse<null> = {
+        success: false,
+        error: 'Failed to update settings',
+        timestamp: new Date().toISOString(),
+      };
+      res.status(500).json(response);
+    }
+  }
+);
+
+// Send WhatsApp message to personal number
+router.post('/whatsapp/send-personal',
+  authMiddleware,
+  settingsLimiter,
+  [
+    body('number').trim().notEmpty().withMessage('Number cannot be empty'),
+    body('message').trim().notEmpty().withMessage('Message cannot be empty'),
+    body('imageUrl').optional().isURL().withMessage('Invalid image URL'),
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      // Validate request
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: 'Validation failed',
+          timestamp: new Date().toISOString(),
+        };
+        return res.status(400).json(response);
+      }
+
+      const { number, message, imageUrl }: WhatsAppMessageRequest = req.body;
+      
+      // Format phone number
+      const formattedNumber = phoneNumberFormatter(number!);
+      
+      // Prepare payload
+      const payload: any = {
+        number: formattedNumber,
+        message: message,
+      };
+      
+      if (imageUrl) {
+        payload.imageUrl = imageUrl;
+      }
+
+      // Send message to WhatsApp API
+      const response = await axios.post(WHATSAPP_PERSONAL_URL, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout: 10000, // 10 seconds timeout
+      });
+
+      const apiResponse: ApiResponse<any> = {
+        success: true,
+        data: {
+          message: 'WhatsApp message sent successfully',
+          response: response.data,
+        },
+        timestamp: new Date().toISOString(),
+      };
+
+      res.json(apiResponse);
+    } catch (error: any) {
+      logger.error('Error sending WhatsApp personal message:', error);
+      const response: ApiResponse<null> = {
+        success: false,
+        error: error.response?.data?.message || 'Failed to send WhatsApp message',
+        timestamp: new Date().toISOString(),
+      };
+      res.status(500).json(response);
+    }
+  }
+);
+
+// Send WhatsApp message to group
+router.post('/whatsapp/send-group',
+  authMiddleware,
+  settingsLimiter,
+  [
+    body('chatId').optional().isString().withMessage('Chat ID must be a string'),
+    body('message').trim().notEmpty().withMessage('Message cannot be empty'),
+    body('imageUrl').optional().isURL().withMessage('Invalid image URL'),
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      // Validate request
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: 'Validation failed',
+          timestamp: new Date().toISOString(),
+        };
+        return res.status(400).json(response);
+      }
+
+      const { chatId, message, imageUrl }: WhatsAppMessageRequest = req.body;
+      
+      // Use provided chatId or default from config
+      const targetChatId = chatId || config.whatsappChatId;
+      
+      if (!targetChatId) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: 'No chat ID provided and no default chat ID configured',
+          timestamp: new Date().toISOString(),
+        };
+        return res.status(400).json(response);
+      }
+
+      // Prepare payload
+      const payload: any = {
+        id: targetChatId,
+        message: message,
+      };
+      
+      if (imageUrl) {
+        // For group messages with images, we need to handle it differently
+        // This would require file upload handling similar to the example
+        payload.imageUrl = imageUrl;
+      }
+
+      // Send message to WhatsApp API
+      const response = await axios.post(WHATSAPP_GROUP_URL, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout: 10000, // 10 seconds timeout
+      });
+
+      const apiResponse: ApiResponse<any> = {
+        success: true,
+        data: {
+          message: 'WhatsApp group message sent successfully',
+          response: response.data,
+        },
+        timestamp: new Date().toISOString(),
+      };
+
+      res.json(apiResponse);
+    } catch (error: any) {
+      logger.error('Error sending WhatsApp group message:', error);
+      const response: ApiResponse<null> = {
+        success: false,
+        error: error.response?.data?.message || 'Failed to send WhatsApp group message',
+        timestamp: new Date().toISOString(),
+      };
+      res.status(500).json(response);
+    }
+  }
+);
+
+// Test WhatsApp connection
+router.post('/whatsapp/test',
+  authMiddleware,
+  settingsLimiter,
+  async (req: Request, res: Response) => {
+    try {
+      if (!config.whatsappEnabled) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: 'WhatsApp integration is disabled',
+          timestamp: new Date().toISOString(),
+        };
+        return res.status(400).json(response);
+      }
+
+      // Test group message
+      const testMessage = `🧪 Test message from Veeam Insight Dashboard\nTimestamp: ${new Date().toISOString()}`;
+      
+      const payload = {
+        id: config.whatsappChatId,
+        message: testMessage,
+      };
+
+      const response = await axios.post(WHATSAPP_GROUP_URL, payload, {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        timeout: 10000,
+      });
+
+      const apiResponse: ApiResponse<any> = {
+        success: true,
+        data: {
+          message: 'WhatsApp test message sent successfully',
+          response: response.data,
+        },
+        timestamp: new Date().toISOString(),
+      };
+
+      res.json(apiResponse);
+    } catch (error: any) {
+      logger.error('Error testing WhatsApp connection:', error);
+      const response: ApiResponse<null> = {
+        success: false,
+        error: error.response?.data?.message || 'Failed to test WhatsApp connection',
+        timestamp: new Date().toISOString(),
+      };
+      res.status(500).json(response);
+    }
+  }
+);
+
+export default router;

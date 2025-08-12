@@ -29,8 +29,10 @@ interface Config {
   healthCheckInterval: number;
   metricsInterval: number;
   whatsappApiUrl?: string;
+  whatsappApiToken?: string;
   whatsappChatId?: string;
   whatsappEnabled: boolean;
+  whatsappDefaultRecipients: string[];
 }
 
 export const config: Config = {
@@ -75,8 +77,10 @@ export const config: Config = {
   
   // WhatsApp Integration
   whatsappApiUrl: process.env.WHATSAPP_API_URL,
+  whatsappApiToken: process.env.WHATSAPP_API_TOKEN,
   whatsappChatId: process.env.WHATSAPP_CHAT_ID,
   whatsappEnabled: process.env.WHATSAPP_ENABLED === 'true',
+  whatsappDefaultRecipients: process.env.WHATSAPP_DEFAULT_RECIPIENTS ? process.env.WHATSAPP_DEFAULT_RECIPIENTS.split(',').map(r => r.trim()) : [],
 };
 
 // Validate required environment variables

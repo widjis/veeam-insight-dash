@@ -49,9 +49,18 @@ const SettingsSchema = z.object({
     channels: z.object({
       email: z.boolean().default(true),
       emailRecipients: z.string().optional().default(""),
+      whatsapp: z.boolean().default(false),
+      whatsappRecipients: z.string().optional().default(""),
       webhook: z.boolean().default(false),
       webhookUrl: z.string().url().optional().or(z.literal("")).default(""),
     }),
+  }),
+  whatsapp: z.object({
+    enabled: z.boolean().default(false),
+    apiUrl: z.string().url().optional().or(z.literal("")).default(""),
+    apiToken: z.string().optional().default(""),
+    chatId: z.string().optional().default(""),
+    defaultRecipients: z.string().optional().default(""),
   }),
   reporting: z.object({
     dailySummary: z.boolean().default(true),
@@ -82,9 +91,18 @@ const DEFAULT_SETTINGS: SettingsValues = {
     channels: {
       email: true,
       emailRecipients: "alerts@example.com",
+      whatsapp: false,
+      whatsappRecipients: "",
       webhook: false,
       webhookUrl: "",
     },
+  },
+  whatsapp: {
+    enabled: false,
+    apiUrl: "http://10.60.10.59:8192",
+    apiToken: "",
+    chatId: "",
+    defaultRecipients: "",
   },
   reporting: {
     dailySummary: true,
@@ -141,15 +159,37 @@ const Settings = () => {
 
   // Load saved settings
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        form.reset(parsed)
-      } catch (e) {
-        // ignore parse errors
+    const loadSettings = async () => {
+      // Load from localStorage first
+      const saved = localStorage.getItem(STORAGE_KEY)
+      let settings = DEFAULT_SETTINGS
+      if (saved) {
+        try {
+          settings = JSON.parse(saved)
+        } catch (e) {
+          // ignore parse errors
+        }
       }
+      
+      // Load WhatsApp settings from backend
+      try {
+        const response = await fetch('/api/settings/whatsapp', {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+        })
+        if (response.ok) {
+          const whatsappSettings = await response.json()
+          settings.whatsapp = whatsappSettings
+        }
+      } catch (error) {
+        console.error('Failed to load WhatsApp settings:', error)
+      }
+      
+      form.reset(settings)
     }
+    
+    loadSettings()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -177,9 +217,142 @@ const Settings = () => {
     }
   }
 
-  const onSubmit = (values: SettingsValues) => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(values))
-    toast({ title: "Settings saved", description: "Your preferences have been updated." })
+  const handleTestWhatsAppPersonal = async () => {
+    try {
+      const response = await fetch('/api/settings/whatsapp/test-personal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          number: '6285712612218', // Example number
+          message: 'Test message from Veeam Insight Dashboard'
+        }),
+      })
+      
+      const result = await response.json()
+      if (response.ok && result.success) {
+        toast({
+          title: "WhatsApp Test Sent",
+          description: "Personal WhatsApp message sent successfully.",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to send WhatsApp message",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send WhatsApp test message",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleTestWhatsAppGroup = async () => {
+    try {
+      const response = await fetch('/api/settings/whatsapp/test-group', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({
+          message: 'Test group message from Veeam Insight Dashboard'
+        }),
+      })
+      
+      const result = await response.json()
+      if (response.ok && result.success) {
+        toast({
+          title: "WhatsApp Group Test Sent",
+          description: "Group WhatsApp message sent successfully.",
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to send WhatsApp group message",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send WhatsApp group test message",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleTestWhatsAppConnection = async () => {
+    try {
+      const response = await fetch('/api/settings/whatsapp/test-connection', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      })
+      
+      const result = await response.json()
+      if (response.ok && result.success) {
+        toast({
+          title: "WhatsApp Connection OK",
+          description: "WhatsApp API connection is working.",
+        })
+      } else {
+        toast({
+          title: "Connection Failed",
+          description: result.error || "WhatsApp API connection failed",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to test WhatsApp connection",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const onSubmit = async (values: SettingsValues) => {
+    try {
+      // Save WhatsApp settings to backend
+      if (values.whatsapp.enabled) {
+        const response = await fetch('/api/settings/whatsapp', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          },
+          body: JSON.stringify({
+            apiUrl: values.whatsapp.apiUrl,
+            apiToken: values.whatsapp.apiToken,
+            chatId: values.whatsapp.chatId,
+            defaultRecipients: values.whatsapp.defaultRecipients,
+            enabled: values.whatsapp.enabled,
+          }),
+        })
+        
+        if (!response.ok) {
+          throw new Error('Failed to save WhatsApp settings')
+        }
+      }
+      
+      // Save to localStorage for other settings
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(values))
+      toast({ title: "Settings saved", description: "Your preferences have been updated." })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save settings",
+        variant: "destructive",
+      })
+    }
   }
 
   const onRestoreDefaults = () => {
@@ -190,6 +363,7 @@ const Settings = () => {
 
   const disabledAlerts = !form.watch("alerts.enabled")
   const emailEnabled = form.watch("alerts.channels.email")
+  const whatsappEnabled = form.watch("alerts.channels.whatsapp")
   const webhookEnabled = form.watch("alerts.channels.webhook")
 
   return (
@@ -207,6 +381,7 @@ const Settings = () => {
         <Tabs defaultValue="alerts" className="mt-4">
           <TabsList>
             <TabsTrigger value="alerts">Alerts</TabsTrigger>
+            <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
             <TabsTrigger value="reporting">Reporting</TabsTrigger>
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="testing">Testing</TabsTrigger>
@@ -346,6 +521,46 @@ const Settings = () => {
 
                       <Card className="border-dashboard-border">
                         <CardHeader>
+                          <CardTitle className="text-base">WhatsApp Channel</CardTitle>
+                          <CardDescription>Send alerts via WhatsApp messages.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <FormField
+                            control={form.control}
+                            name="alerts.channels.whatsapp"
+                            render={({ field }) => (
+                              <FormItem className="flex items-center justify-between">
+                                <FormLabel>Enable WhatsApp</FormLabel>
+                                <FormControl>
+                                  <Switch disabled={disabledAlerts} checked={field.value} onCheckedChange={field.onChange} />
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="alerts.channels.whatsappRecipients"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Recipients</FormLabel>
+                                <FormControl>
+                                  <Textarea
+                                    rows={3}
+                                    placeholder="+6281234567890, +6287654321098"
+                                    disabled={disabledAlerts || !whatsappEnabled}
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormDescription>Comma-separated phone numbers with country code (e.g., +62 for Indonesia).</FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </CardContent>
+                      </Card>
+
+                      <Card className="border-dashboard-border">
+                        <CardHeader>
                           <CardTitle className="text-base">Webhook Channel</CardTitle>
                           <CardDescription>Send alerts to a webhook (e.g., Slack, Teams).</CardDescription>
                         </CardHeader>
@@ -398,6 +613,144 @@ const Settings = () => {
                     >
                       Send test alert
                     </Button>
+                    <Button type="submit">Save changes</Button>
+                  </CardFooter>
+                </Card>
+              </TabsContent>
+
+              {/* WhatsApp */}
+              <TabsContent value="whatsapp" className="space-y-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>WhatsApp Configuration</CardTitle>
+                    <CardDescription>
+                      Configure WhatsApp API settings for sending messages and notifications.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <FormField
+                      control={form.control}
+                      name="whatsapp.enabled"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center justify-between">
+                          <div>
+                            <FormLabel>Enable WhatsApp</FormLabel>
+                            <FormDescription>
+                              Turn on to enable WhatsApp messaging functionality.
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch checked={field.value} onCheckedChange={field.onChange} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <FormField
+                        control={form.control}
+                        name="whatsapp.apiUrl"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>API URL</FormLabel>
+                            <FormControl>
+                              <Input 
+                                placeholder="http://10.60.10.59:8192" 
+                                disabled={!form.watch("whatsapp.enabled")} 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormDescription>WhatsApp API server URL.</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="whatsapp.apiToken"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>API Token</FormLabel>
+                            <FormControl>
+                              <Input 
+                                type="password" 
+                                placeholder="Enter API token" 
+                                disabled={!form.watch("whatsapp.enabled")} 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormDescription>Authentication token for WhatsApp API.</FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="whatsapp.chatId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Group Chat ID</FormLabel>
+                          <FormControl>
+                            <Input 
+                              placeholder="Enter group chat ID for group messages" 
+                              disabled={!form.watch("whatsapp.enabled")} 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>Chat ID for sending group messages.</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="whatsapp.defaultRecipients"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Default Recipients</FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Enter phone numbers separated by commas (e.g., 6285712612218, 6281234567890)" 
+                              disabled={!form.watch("whatsapp.enabled")} 
+                              {...field} 
+                            />
+                          </FormControl>
+                          <FormDescription>Default phone numbers for personal messages (with country code).</FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </CardContent>
+                  <CardFooter className="flex justify-between">
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleTestWhatsAppConnection}
+                        disabled={!form.watch("whatsapp.enabled")}
+                      >
+                        Test Connection
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleTestWhatsAppPersonal}
+                        disabled={!form.watch("whatsapp.enabled")}
+                      >
+                        Test Personal Message
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleTestWhatsAppGroup}
+                        disabled={!form.watch("whatsapp.enabled")}
+                      >
+                        Test Group Message
+                      </Button>
+                    </div>
                     <Button type="submit">Save changes</Button>
                   </CardFooter>
                 </Card>

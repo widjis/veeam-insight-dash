@@ -85,6 +85,7 @@ export interface AlertRule {
   actions: {
     email?: boolean;
     whatsapp?: boolean;
+    whatsappRecipients?: string[];
     webhook?: string;
   };
 }
