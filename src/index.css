@@ -8,33 +8,65 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 218 25% 97%;
+    --foreground: 220 20% 14%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 220 20% 14%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 220 20% 14%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 210 95% 52%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 220 13% 91%;
+    --secondary-foreground: 220 20% 14%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 220 13% 91%;
+    --muted-foreground: 220 8% 46%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 210 95% 52%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 220 13% 88%;
+    --input: 220 13% 88%;
+    --ring: 210 95% 52%;
+
+    /* Veeam-specific colors */
+    --veeam-primary: 210 95% 52%;
+    --veeam-secondary: 220 13% 91%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 45 93% 58%;
+    --warning-foreground: 0 0% 100%;
+    --info: 210 95% 52%;
+    --info-foreground: 0 0% 100%;
+
+    /* Dashboard specific */
+    --dashboard-bg: 218 25% 97%;
+    --dashboard-card: 0 0% 100%;
+    --dashboard-border: 220 13% 88%;
+    
+    /* Status colors */
+    --status-success: 142 71% 45%;
+    --status-warning: 45 93% 58%;
+    --status-error: 0 84% 60%;
+    --status-info: 210 95% 52%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(210 95% 52%), hsl(210 95% 62%));
+    --gradient-success: linear-gradient(135deg, hsl(142 71% 45%), hsl(142 71% 55%));
+    --gradient-warning: linear-gradient(135deg, hsl(45 93% 58%), hsl(45 93% 68%));
+    --gradient-error: linear-gradient(135deg, hsl(0 84% 60%), hsl(0 84% 70%));
+
+    /* Shadows */
+    --shadow-soft: 0 4px 12px -4px hsl(220 20% 14% / 0.1);
+    --shadow-medium: 0 8px 24px -8px hsl(220 20% 14% / 0.15);
+    --shadow-strong: 0 16px 48px -16px hsl(220 20% 14% / 0.2);
 
     --radius: 0.5rem;
 
