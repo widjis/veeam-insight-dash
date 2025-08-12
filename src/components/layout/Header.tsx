@@ -9,6 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Link } from "react-router-dom";
 
 export const Header = () => {
   return (
@@ -71,9 +72,11 @@ export const Header = () => {
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Admin User</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
-                <Settings className="mr-2 h-4 w-4" />
-                Settings
+              <DropdownMenuItem asChild>
+                <Link to="/settings" className="flex items-center">
+                  <Settings className="mr-2 h-4 w-4" />
+                  Settings
+                </Link>
               </DropdownMenuItem>
               <DropdownMenuItem>
                 Profile
