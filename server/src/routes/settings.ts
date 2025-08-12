@@ -478,4 +478,237 @@ router.post('/whatsapp/test',
   }
 );
 
+// WhatsApp-specific settings endpoints
+router.get('/whatsapp', authMiddleware, settingsLimiter, async (req: Request, res: Response) => {
+  try {
+    const whatsappSettings = {
+      enabled: config.whatsappEnabled || false,
+      apiUrl: config.whatsappApiUrl || '',
+      apiToken: '', // Don't return the actual token for security
+      chatId: config.whatsappChatId || '',
+      defaultRecipients: config.whatsappDefaultRecipients || []
+    };
+
+    const response: ApiResponse<typeof whatsappSettings> = {
+      success: true,
+      data: whatsappSettings,
+      timestamp: new Date().toISOString(),
+    };
+    res.json(response);
+  } catch (error: any) {
+    logger.error('Error fetching WhatsApp settings:', error);
+    const response: ApiResponse<null> = {
+      success: false,
+      error: 'Failed to fetch WhatsApp settings',
+      timestamp: new Date().toISOString(),
+    };
+    res.status(500).json(response);
+  }
+});
+
+router.put('/whatsapp',
+  authMiddleware,
+  settingsLimiter,
+  [
+    body('enabled').optional().isBoolean().withMessage('Enabled must be a boolean'),
+    body('apiUrl').optional().isURL().withMessage('Invalid API URL'),
+    body('apiToken').optional().isString().withMessage('API token must be a string'),
+    body('chatId').optional().isString().withMessage('Chat ID must be a string'),
+    body('defaultRecipients').optional().isArray().withMessage('Default recipients must be an array'),
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: `Validation error: ${errors.array().map(e => e.msg).join(', ')}`,
+          timestamp: new Date().toISOString(),
+        };
+        return res.status(400).json(response);
+      }
+
+      const { enabled, apiUrl, apiToken, chatId, defaultRecipients } = req.body;
+      const updates: Record<string, string> = {};
+
+      if (enabled !== undefined) {
+        updates.WHATSAPP_ENABLED = enabled.toString();
+      }
+      if (apiUrl !== undefined) {
+        updates.WHATSAPP_API_URL = apiUrl;
+      }
+      if (apiToken !== undefined && apiToken.trim() !== '') {
+        updates.WHATSAPP_API_TOKEN = apiToken;
+      }
+      if (chatId !== undefined) {
+        updates.WHATSAPP_CHAT_ID = chatId;
+      }
+      if (defaultRecipients !== undefined) {
+        updates.WHATSAPP_DEFAULT_RECIPIENTS = defaultRecipients.join(',');
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await updateEnvFile(updates);
+        logger.info('WhatsApp settings updated successfully');
+      }
+
+      const response: ApiResponse<{ message: string }> = {
+        success: true,
+        data: { message: 'WhatsApp settings updated successfully' },
+        timestamp: new Date().toISOString(),
+      };
+      res.json(response);
+    } catch (error: any) {
+      logger.error('Error updating WhatsApp settings:', error);
+      const response: ApiResponse<null> = {
+        success: false,
+        error: 'Failed to update WhatsApp settings',
+        timestamp: new Date().toISOString(),
+      };
+      res.status(500).json(response);
+    }
+  }
+);
+
+router.post('/whatsapp/test-personal',
+  authMiddleware,
+  settingsLimiter,
+  [
+    body('message').optional().trim().isString().withMessage('Message must be a string'),
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: `Validation error: ${errors.array().map(e => e.msg).join(', ')}`,
+          timestamp: new Date().toISOString(),
+        };
+        return res.status(400).json(response);
+      }
+
+      const { message } = req.body;
+      const testNumber = '6285712612218'; // Default test number
+      
+      const response = await axios.post(WHATSAPP_PERSONAL_URL, {
+        number: phoneNumberFormatter(testNumber),
+        message: message || 'Test personal message from Veeam Insight Dashboard',
+      }, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      logger.info('WhatsApp personal test successful:', response.data);
+      
+      const apiResponse: ApiResponse<{ message: string }> = {
+        success: true,
+        data: { message: 'Personal WhatsApp test message sent successfully' },
+        timestamp: new Date().toISOString(),
+      };
+      res.json(apiResponse);
+    } catch (error: any) {
+      logger.error('Error sending WhatsApp personal test:', error);
+      const response: ApiResponse<null> = {
+        success: false,
+        error: error.response?.data?.message || 'Failed to send personal test message',
+        timestamp: new Date().toISOString(),
+      };
+      res.status(500).json(response);
+    }
+  }
+);
+
+router.post('/whatsapp/test-group',
+  authMiddleware,
+  settingsLimiter,
+  [
+    body('message').optional().trim().isString().withMessage('Message must be a string'),
+  ],
+  async (req: Request, res: Response) => {
+    try {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: `Validation error: ${errors.array().map(e => e.msg).join(', ')}`,
+          timestamp: new Date().toISOString(),
+        };
+        return res.status(400).json(response);
+      }
+
+      const { message } = req.body;
+      const chatId = config.whatsappChatId || '120363123402010871@g.us';
+      
+      const response = await axios.post(WHATSAPP_GROUP_URL, {
+        id: chatId,
+        message: message || 'Test group message from Veeam Insight Dashboard',
+      }, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      logger.info('WhatsApp group test successful:', response.data);
+      
+      const apiResponse: ApiResponse<{ message: string }> = {
+        success: true,
+        data: { message: 'Group WhatsApp test message sent successfully' },
+        timestamp: new Date().toISOString(),
+      };
+      res.json(apiResponse);
+    } catch (error: any) {
+      logger.error('Error sending WhatsApp group test:', error);
+      const response: ApiResponse<null> = {
+        success: false,
+        error: error.response?.data?.message || 'Failed to send group test message',
+        timestamp: new Date().toISOString(),
+      };
+      res.status(500).json(response);
+    }
+  }
+);
+
+router.post('/whatsapp/test-connection',
+  authMiddleware,
+  settingsLimiter,
+  async (req: Request, res: Response) => {
+    try {
+      // Test WhatsApp API connection
+      const testMessage = 'Connection test from Veeam Insight Dashboard';
+      const chatId = config.whatsappChatId || '120363123402010871@g.us';
+      
+      const response = await axios.post(WHATSAPP_GROUP_URL, {
+        id: chatId,
+        message: testMessage,
+      }, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      logger.info('WhatsApp connection test successful:', response.data);
+      
+      const apiResponse: ApiResponse<{ message: string }> = {
+        success: true,
+        data: { message: 'WhatsApp API connection test successful' },
+        timestamp: new Date().toISOString(),
+      };
+      res.json(apiResponse);
+    } catch (error: any) {
+      logger.error('Error testing WhatsApp connection:', error);
+      const response: ApiResponse<null> = {
+        success: false,
+        error: error.response?.data?.message || 'Failed to test WhatsApp API connection',
+        timestamp: new Date().toISOString(),
+      };
+      res.status(500).json(response);
+    }
+  }
+);
+
 export default router;

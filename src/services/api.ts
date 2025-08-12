@@ -295,6 +295,108 @@ class ApiClient {
       };
     }
   }
+
+  // WhatsApp API methods
+  async getWhatsAppSettings(): Promise<ApiResponse<any>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.get(
+        '/api/settings/whatsapp'
+      );
+      
+      // Transform defaultRecipients array to string for frontend form compatibility
+      if (response.data.success && response.data.data) {
+        const data = response.data.data;
+        if (Array.isArray(data.defaultRecipients)) {
+          data.defaultRecipients = data.defaultRecipients.join(', ');
+        }
+      }
+      
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to fetch WhatsApp settings',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async updateWhatsAppSettings(settings: {
+    apiUrl: string;
+    apiToken: string;
+    chatId: string;
+    defaultRecipients: string;
+    enabled: boolean;
+  }): Promise<ApiResponse<any>> {
+    try {
+      // Transform defaultRecipients string to array for backend validation
+      const transformedSettings = {
+        ...settings,
+        defaultRecipients: settings.defaultRecipients 
+          ? settings.defaultRecipients.split(',').map(r => r.trim()).filter(r => r.length > 0)
+          : []
+      };
+      
+      const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.put(
+        '/api/settings/whatsapp',
+        transformedSettings
+      );
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to update WhatsApp settings',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async testWhatsAppPersonal(data: { number: string; message: string }): Promise<ApiResponse<any>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.post(
+        '/api/settings/whatsapp/test-personal',
+        data
+      );
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to send WhatsApp personal message',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async testWhatsAppGroup(data: { message: string }): Promise<ApiResponse<any>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.post(
+        '/api/settings/whatsapp/test-group',
+        data
+      );
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to send WhatsApp group message',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async testWhatsAppConnection(): Promise<ApiResponse<any>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.post(
+        '/api/settings/whatsapp/test-connection'
+      );
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to test WhatsApp connection',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
 }
 
 // Create and export a singleton instance

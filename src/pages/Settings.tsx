@@ -173,19 +173,20 @@ const Settings = () => {
       
       // Load WhatsApp settings from backend
       try {
-        const response = await fetch('/api/settings/whatsapp', {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          },
-        })
-        if (response.ok) {
-          const whatsappSettings = await response.json()
-          settings.whatsapp = whatsappSettings
+        console.log('Loading WhatsApp settings from backend...')
+        const result = await apiClient.getWhatsAppSettings()
+        console.log('WhatsApp settings result:', result)
+        if (result.success && result.data) {
+          console.log('WhatsApp settings data:', result.data)
+          settings.whatsapp = result.data
+        } else {
+          console.error('Failed to load WhatsApp settings:', result.error)
         }
       } catch (error) {
         console.error('Failed to load WhatsApp settings:', error)
       }
       
+      console.log('Final settings before form reset:', settings)
       form.reset(settings)
     }
     
@@ -219,20 +220,12 @@ const Settings = () => {
 
   const handleTestWhatsAppPersonal = async () => {
     try {
-      const response = await fetch('/api/settings/whatsapp/test-personal', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({
-          number: '6285712612218', // Example number
-          message: 'Test message from Veeam Insight Dashboard'
-        }),
+      const result = await apiClient.testWhatsAppPersonal({
+        number: '6285712612218', // Example number
+        message: 'Test message from Veeam Insight Dashboard'
       })
       
-      const result = await response.json()
-      if (response.ok && result.success) {
+      if (result.success) {
         toast({
           title: "WhatsApp Test Sent",
           description: "Personal WhatsApp message sent successfully.",
@@ -255,19 +248,11 @@ const Settings = () => {
 
   const handleTestWhatsAppGroup = async () => {
     try {
-      const response = await fetch('/api/settings/whatsapp/test-group', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-        body: JSON.stringify({
-          message: 'Test group message from Veeam Insight Dashboard'
-        }),
+      const result = await apiClient.testWhatsAppGroup({
+        message: 'Test group message from Veeam Insight Dashboard'
       })
       
-      const result = await response.json()
-      if (response.ok && result.success) {
+      if (result.success) {
         toast({
           title: "WhatsApp Group Test Sent",
           description: "Group WhatsApp message sent successfully.",
@@ -290,15 +275,9 @@ const Settings = () => {
 
   const handleTestWhatsAppConnection = async () => {
     try {
-      const response = await fetch('/api/settings/whatsapp/test-connection', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-        },
-      })
+      const result = await apiClient.testWhatsAppConnection()
       
-      const result = await response.json()
-      if (response.ok && result.success) {
+      if (result.success) {
         toast({
           title: "WhatsApp Connection OK",
           description: "WhatsApp API connection is working.",
@@ -321,26 +300,17 @@ const Settings = () => {
 
   const onSubmit = async (values: SettingsValues) => {
     try {
-      // Save WhatsApp settings to backend
-      if (values.whatsapp.enabled) {
-        const response = await fetch('/api/settings/whatsapp', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          },
-          body: JSON.stringify({
-            apiUrl: values.whatsapp.apiUrl,
-            apiToken: values.whatsapp.apiToken,
-            chatId: values.whatsapp.chatId,
-            defaultRecipients: values.whatsapp.defaultRecipients,
-            enabled: values.whatsapp.enabled,
-          }),
-        })
-        
-        if (!response.ok) {
-          throw new Error('Failed to save WhatsApp settings')
-        }
+      // Save WhatsApp settings to backend (always save, regardless of enabled state)
+      const result = await apiClient.updateWhatsAppSettings({
+        apiUrl: values.whatsapp.apiUrl,
+        apiToken: values.whatsapp.apiToken,
+        chatId: values.whatsapp.chatId,
+        defaultRecipients: values.whatsapp.defaultRecipients,
+        enabled: values.whatsapp.enabled,
+      })
+      
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to save WhatsApp settings')
       }
       
       // Save to localStorage for other settings
@@ -349,7 +319,7 @@ const Settings = () => {
     } catch (error) {
       toast({
         title: "Error",
-        description: "Failed to save settings",
+        description: error instanceof Error ? error.message : "Failed to save settings",
         variant: "destructive",
       })
     }
@@ -679,7 +649,7 @@ const Settings = () => {
                                 {...field} 
                               />
                             </FormControl>
-                            <FormDescription>Authentication token for WhatsApp API.</FormDescription>
+                            <FormDescription>Authentication token for WhatsApp API (optional if no auth required).</FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
