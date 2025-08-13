@@ -1,5 +1,51 @@
 # Veeam Insight Dashboard - Development Journal
 
+## Module Resolution Fix - August 13, 2025 (20:30 WIB)
+
+### 🔧 Fixed TypeScript Path Alias Resolution Error
+
+**Issue Identified:**
+- Docker container failing with `Error [ERR_MODULE_NOT_FOUND]: Cannot find package '@/config'`
+- TypeScript path aliases (`@/*`) not being resolved at runtime in Node.js
+- Build process only compiling TypeScript but not resolving import paths
+
+**Root Cause Analysis:**
+- TypeScript compiler (tsc) compiles code but doesn't resolve path aliases to relative paths
+- Node.js ESM loader cannot resolve `@/config` imports at runtime
+- Missing module resolution step in build process
+
+**Solution Implemented:**
+
+1. **Installed tsc-alias package** as dev dependency:
+   ```bash
+   npm install --save-dev tsc-alias
+   ```
+
+2. **Updated build script** in `server/package.json`:
+   ```json
+   "build": "tsc && tsc-alias"
+   ```
+
+3. **Verified fix** by checking compiled output:
+   - `@/config/environment.js` → `./config/environment.js`
+   - `@/utils/logger.js` → `./utils/logger.js`
+   - All path aliases properly resolved to relative imports
+
+**Technical Impact:**
+- Docker container now starts successfully without module resolution errors
+- TypeScript path aliases work correctly in production builds
+- No changes needed to source code - transparent fix
+- Build process now handles both compilation and path resolution
+
+**Files Modified:**
+- `server/package.json` - Updated build script to include tsc-alias
+- `server/package-lock.json` - Added tsc-alias dependency
+
+**Testing:**
+- Local build completed successfully
+- Generated dist/server.js contains resolved relative imports
+- Server starts without module resolution errors
+
 ## Port Configuration Improvements - August 13, 2025 (18:07 WIB)
 
 ### 🔧 Docker Compose Port Configuration Enhancement
