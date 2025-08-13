@@ -8,8 +8,8 @@ WORKDIR /app/frontend
 COPY package*.json ./
 COPY bun.lockb ./
 
-# Install frontend dependencies
-RUN npm ci --only=production
+# Install frontend dependencies (including devDependencies for build)
+RUN npm ci
 
 # Copy frontend source code
 COPY . .

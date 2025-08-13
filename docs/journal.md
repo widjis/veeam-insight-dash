@@ -1,5 +1,34 @@
 # Veeam Insight Dashboard - Development Journal
 
+## Docker Build Fix - August 13, 2025 (17:32 WIB)
+
+### 🐳 Fixed Frontend Build Issue in Docker
+
+**Issue Identified:**
+- Docker build failing with error: `sh: vite: not found`
+- Frontend build stage was unable to find Vite during `npm run build`
+- Build process was terminating with exit code 127
+
+**Root Cause Analysis:**
+- Dockerfile was using `npm ci --only=production` for frontend dependencies
+- Vite is listed in `devDependencies` in package.json
+- The `--only=production` flag excludes devDependencies, making Vite unavailable during build
+
+**Resolution:**
+- ✅ **Fixed Dockerfile**: Changed `npm ci --only=production` to `npm ci` in frontend build stage
+- ✅ **Verified Dependencies**: Confirmed Vite is properly listed in devDependencies
+- ✅ **Build Process**: Frontend build stage now includes all dependencies needed for compilation
+
+**Files Modified:**
+- `Dockerfile` - Line 12: Removed `--only=production` flag from frontend dependency installation
+
+**Technical Notes:**
+- Frontend build requires devDependencies (Vite, TypeScript, etc.) for compilation
+- Production runtime stage still uses optimized dependencies from backend build
+- Multi-stage build ensures final image remains lean while supporting proper build process
+
+---
+
 ## Alert System Enhancement: Health Checks, WhatsApp Fixes & Auto-Resend - August 13, 2025
 
 ### 🚀 Enhanced Alert System with Health Check Rules and Auto-Resend
