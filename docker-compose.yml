@@ -68,8 +68,8 @@ services:
     container_name: veeam-insight-nginx
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "9007:80"
+      - "9008:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro

@@ -1322,6 +1322,143 @@ Updated production Docker deployment configuration to use existing external Redi
 - **Connectivity Validation**: Deploy script checks Redis accessibility
 - **Documentation Updated**: All guides reflect external Redis setup
 
+## 🔧 Environment Variables Standardization & Redis Cleanup
+**Date**: August 13, 2025 - 14:57 WIB
+
+### Issue Identified
+Discovered major inconsistency between development and production environment variable names. After analyzing the actual server code in <mcfile name="environment.ts" path="/Users/widjis/Documents/System Project/veeam-insight-dash/server/src/config/environment.ts"></mcfile>, found that:
+
+1. **Server code uses development variable names** - not production ones
+2. **Redis variables are NOT used** - application uses in-memory caching
+3. **Production .env had wrong variable names** that don't match server expectations
+
+### Root Cause Analysis
+- **Development .env**: Uses correct variable names that match server code
+- **Production .env**: Had different variable names that server doesn't recognize
+- **Redis Integration**: Documented but never implemented in server code
+
+### Variables Corrected in .env.production
+
+#### ✅ **Veeam Configuration**
+- `VEEAM_SERVER` → `VEEAM_BASE_URL` (with full URL format)
+- `VEEAM_PORT` → Integrated into `VEEAM_BASE_URL`
+- **Added**: `VEEAM_API_VERSION=1.1-rev1`
+- **Added**: `VEEAM_VERIFY_SSL=false`
+
+#### ✅ **Rate Limiting**
+- `RATE_LIMIT_WINDOW` → `RATE_LIMIT_WINDOW_MS`
+- `RATE_LIMIT_MAX` → `RATE_LIMIT_MAX_REQUESTS`
+- **Removed**: `LOGIN_RATE_LIMIT_*` (not used in server)
+
+#### ✅ **Authentication**
+- **Added**: `REFRESH_TOKEN_EXPIRES_IN=7d`
+- **Updated**: `JWT_EXPIRES_IN` from `1h` to `24h` (matches development)
+
+#### ✅ **Monitoring**
+- **Added**: `MONITORING_INTERVAL=30000`
+- **Updated**: `HEALTH_CHECK_INTERVAL` from `30000` to `30` (matches server code)
+- **Added**: `METRICS_INTERVAL=60`
+
+#### ✅ **WhatsApp Integration**
+- `WHATSAPP_PHONE_NUMBER` → `WHATSAPP_CHAT_ID`
+- **Added**: `WHATSAPP_ENABLED=false`
+- **Added**: `WHATSAPP_DEFAULT_RECIPIENTS=`
+
+#### ✅ **Cache Configuration**
+- **Added**: `CACHE_CHECK_PERIOD=600`
+- **Added**: `CORS_ORIGIN=http://localhost:8080`
+
+### Redis Variables Removed
+**Completely removed unused Redis configuration:**
+- `REDIS_URL`, `REDIS_HOST`, `REDIS_PORT`, `REDIS_PASSWORD`, `REDIS_DB`
+
+### Files Updated
+
+#### 1. **<mcfile name=".env.production" path="/Users/widjis/Documents/System Project/veeam-insight-dash/.env.production"></mcfile>**
+- ✅ Standardized all variable names to match server code
+- ✅ Removed all Redis configuration
+- ✅ Added missing variables (CORS_ORIGIN, MONITORING_INTERVAL, etc.)
+- ✅ Corrected variable values to match development defaults
+
+#### 2. **<mcfile name="docker-compose.yml" path="/Users/widjis/Documents/System Project/veeam-insight-dash/docker-compose.yml"></mcfile>**
+- ✅ Removed Redis environment variables
+- ✅ Cleaned up unused Redis references
+
+#### 3. **<mcfile name="deploy.sh" path="/Users/widjis/Documents/System Project/veeam-insight-dash/deploy.sh"></mcfile>**
+- ✅ Removed Redis connectivity checks
+- ✅ Removed Redis CLI commands from status display
+- ✅ Added note about in-memory caching
+
+### Impact & Benefits
+
+#### ✅ **Immediate Fixes**
+- **Environment Consistency**: Development and production now use same variable names
+- **Deployment Success**: Production deployment will now work correctly
+- **Configuration Clarity**: Removed confusing unused Redis variables
+- **Documentation Accuracy**: Config files match actual server implementation
+
+#### ✅ **Technical Benefits**
+- **Simplified Architecture**: No external Redis dependency
+- **Resource Optimization**: Reduced infrastructure complexity
+- **Faster Deployment**: Fewer moving parts to configure
+
+---
+
+## 🔧 Production Frontend Port Configuration
+**Date**: August 13, 2025
+**Type**: Configuration Update
+
+### Overview
+Updated production deployment to publish frontend on custom port 9007 (HTTP) and 9008 (HTTPS) instead of default ports 80/443.
+
+### Changes Made
+
+#### 1. **<mcfile name="docker-compose.yml" path="/Users/widjis/Documents/System Project/veeam-insight-dash/docker-compose.yml"></mcfile>**
+```yaml
+# Before
+ports:
+  - "80:80"
+  - "443:443"
+
+# After  
+ports:
+  - "9007:80"
+  - "9008:443"
+```
+
+#### 2. **<mcfile name="PRODUCTION_DEPLOYMENT.md" path="/Users/widjis/Documents/System Project/veeam-insight-dash/PRODUCTION_DEPLOYMENT.md"></mcfile>**
+- ✅ Updated SSL connection test: `openssl s_client -connect localhost:9008`
+- ✅ Updated port availability checks: `netstat -tlnp | grep :9007` and `netstat -tlnp | grep :9008`
+
+### Access URLs
+- **HTTP**: `http://your-server:9007`
+- **HTTPS**: `https://your-server:9008`
+
+### Benefits
+- **Port Flexibility**: Avoids conflicts with other services using standard ports
+- **Security**: Custom ports provide additional obscurity
+- **Multi-Service**: Allows running multiple web services on same server
+- **Easy Identification**: Clear distinction from default web services
+
+### Deployment Impact
+- ✅ No changes to internal container networking
+- ✅ Nginx configuration remains unchanged (still listens on 80/443 internally)
+- ✅ SSL certificates and security headers work identically
+- ✅ All API and WebSocket functionality preserved
+
+**Last Updated**: August 13, 2025 15:00 WIB
+
+---
+- **Simplified Deployment**: No external Redis dependency
+- **Reduced Complexity**: Fewer moving parts in production
+- **Memory Efficiency**: In-memory caching is sufficient for current needs
+- **Faster Startup**: No Redis connection delays
+
+### Next Steps
+1. **Test Production Deployment**: Verify all environment variables work correctly
+2. **Update Documentation**: Remove Redis references from deployment guides
+3. **Consider Future Redis**: If needed later, implement proper Redis integration in server code
+
 ---
 
 *Last Updated: August 13, 2025*

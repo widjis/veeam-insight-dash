@@ -271,14 +271,14 @@ docker-compose exec veeam-insight redis-cli -h host.docker.internal ping
 openssl x509 -in ssl/cert.pem -text -noout
 
 # Test SSL connection
-openssl s_client -connect localhost:443
+openssl s_client -connect localhost:9008
 ```
 
 #### 2. Connection Issues
 ```bash
 # Check port availability
-netstat -tlnp | grep :443
-netstat -tlnp | grep :80
+netstat -tlnp | grep :9008
+netstat -tlnp | grep :9007
 
 # Test internal connectivity
 docker-compose exec veeam-insight curl http://localhost:3001/api/health
