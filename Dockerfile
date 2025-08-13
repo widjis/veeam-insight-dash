@@ -11,8 +11,16 @@ COPY bun.lockb ./
 # Install frontend dependencies (including devDependencies for build)
 RUN npm ci
 
-# Copy frontend source code
-COPY . .
+# Copy frontend source code (exclude server directory)
+COPY src ./src
+COPY public ./public
+COPY index.html ./
+COPY vite.config.ts ./
+COPY tsconfig*.json ./
+COPY tailwind.config.ts ./
+COPY postcss.config.js ./
+COPY components.json ./
+COPY eslint.config.js ./
 
 # Build frontend for production
 RUN npm run build
@@ -51,16 +59,20 @@ RUN adduser -S veeam -u 1001
 # Set working directory
 WORKDIR /app
 
-# Copy built frontend assets
-COPY --from=frontend-build --chown=veeam:nodejs /app/frontend/dist ./public
+# Copy built frontend assets to a temporary location
+COPY --from=frontend-build --chown=veeam:nodejs /app/frontend/dist ./frontend-dist
 
 # Copy built backend
 COPY --from=backend-build --chown=veeam:nodejs /app/backend/dist ./dist
 COPY --from=backend-build --chown=veeam:nodejs /app/backend/node_modules ./node_modules
 COPY --from=backend-build --chown=veeam:nodejs /app/backend/package*.json ./
 
-# Create logs and tokens directories
-RUN mkdir -p /app/logs /app/tokens && chown -R veeam:nodejs /app/logs /app/tokens
+# Copy entrypoint script
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Create logs, tokens, and public directories
+RUN mkdir -p /app/logs /app/tokens /app/public && chown -R veeam:nodejs /app/logs /app/tokens /app/public
 
 # Switch to non-root user
 USER veeam
@@ -72,8 +84,8 @@ EXPOSE 3001 3002
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3001/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
-# Use dumb-init to handle signals properly
-ENTRYPOINT ["dumb-init", "--"]
+# Set entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
 
 # Start the application
 CMD ["node", "dist/server.js"]

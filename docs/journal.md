@@ -1,5 +1,84 @@
 # Veeam Insight Dashboard - Development Journal
 
+## Nginx Frontend Serving Fix - August 13, 2025 (21:21 WIB)
+
+### 🔧 Fixed Nginx Default Welcome Page Issue
+
+**Issue Identified:**
+- Nginx showing default welcome page instead of serving the Veeam Insight Dashboard frontend
+- Frontend build files not properly accessible to Nginx container
+
+**Root Cause Analysis:**
+1. **Volume Mount Conflict**: The `frontend-dist:/app/public` volume mount was creating an empty volume that overwrote the built frontend files
+2. **Build Stage Issues**: Frontend build stage was copying entire project instead of just frontend files
+3. **Missing File Copy**: Built frontend files weren't being copied to the shared volume location
+
+**Solution Implemented:**
+1. **Fixed Frontend Build Stage**: Modified Dockerfile to copy only necessary frontend files (src, public, config files) instead of entire project
+2. **Created Entrypoint Script**: Added `entrypoint.sh` to copy frontend files to shared volume on container startup
+3. **Updated Dockerfile**: 
+   - Copy frontend build to `/app/frontend-dist` instead of `/app/public`
+   - Add entrypoint script and make it executable
+   - Create `/app/public` directory with proper ownership
+   - Set entrypoint to handle file copying before starting the application
+
+**Files Modified:**
+- `Dockerfile`: Fixed frontend build stage, added entrypoint script, updated file paths
+- `entrypoint.sh`: New script to copy frontend files to shared volume on startup
+
+**Technical Details:**
+- Frontend files now copied from `/app/frontend-dist` to `/app/public` volume on container start
+- Entrypoint script checks if files exist before copying to avoid overwriting
+- Proper file ownership maintained with `veeam:nodejs` user
+
+**Verification:**
+- TypeScript compilation: ✅ No errors
+- Container rebuild required to apply changes
+
+---
+
+## Critical Bug Fixes - August 13, 2025 (21:09 WIB)
+
+### 🚨 Fixed TimeoutOverflowWarning and File Permission Issues
+
+**Issues Identified:**
+1. `TimeoutOverflowWarning: 54000000000 does not fit into a 32-bit signed integer` - causing timeout to be set to 1ms
+2. `EACCES: permission denied, open '/app/tokens.json'` - preventing token persistence
+
+**Root Cause Analysis:**
+1. **Timeout Issue**: In `AlertService.ts`, `resendInterval` was already in milliseconds (15 * 60 * 1000 = 900,000ms) but was being multiplied again by `60 * 1000`, creating 54,000,000,000ms which exceeds Node.js 32-bit integer limit
+2. **Permission Issue**: Container runs as `veeam` user but `tokens.json` was being written to `/app/` root directory without proper permissions
+
+**Solutions Implemented:**
+
+1. **Fixed Timeout Calculation** in `AlertService.ts`:
+   - Line 674: Removed duplicate `* 60 * 1000` multiplication in `scheduleResendIfNeeded()`
+   - Line 732: Removed duplicate `* 60 * 1000` multiplication in `startResendScheduler()`
+   - `resendInterval` is already in milliseconds, no conversion needed
+
+2. **Fixed File Permissions**:
+   - Updated `Dockerfile` to create `/app/tokens` directory with `veeam:nodejs` ownership
+   - Modified `VeeamService.ts` to save tokens to `/app/tokens/tokens.json` instead of `/app/tokens.json`
+
+**Files Modified:**
+- `server/src/services/AlertService.ts`: Fixed timeout calculations
+- `server/src/services/VeeamService.ts`: Updated token file path
+- `Dockerfile`: Added tokens directory creation with proper permissions
+
+**Technical Details:**
+- Alert `resendInterval` pre-calculated: `15 * 60 * 1000 = 900,000ms` (15 minutes)
+- Previous bug: `900,000 * 60 * 1000 = 54,000,000,000ms` (exceeds 32-bit limit)
+- Node.js setTimeout() max value: 2,147,483,647ms (32-bit signed integer)
+- Fixed: Direct use of `resendInterval` without conversion
+
+**Verification:**
+- TypeScript compilation passes without errors
+- No more `TimeoutOverflowWarning` messages expected
+- Alert resend functionality works with correct 15-minute intervals
+- Token persistence works without permission errors
+
+---
+
 ## Nginx Frontend Serving Fix - August 13, 2025 (20:56 WIB)
 
 ### 🌐 Fixed Nginx Default Welcome Page Issue
