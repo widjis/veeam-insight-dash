@@ -1,5 +1,38 @@
 # Veeam Insight Dashboard - Development Journal
 
+## Port Configuration Improvements - August 13, 2025 (18:07 WIB)
+
+### 🔧 Docker Compose Port Configuration Enhancement
+
+**Issue Identified:**
+- Docker Compose healthcheck and port mappings were using hardcoded values instead of environment variables
+- Port changes required manual editing of multiple files
+- Inconsistent configuration management across the application
+
+**Solution Implemented:**
+
+1. **Updated docker-compose.yml** to use environment variables for all port configurations:
+   - Changed port mappings from `"3001:3001"` to `"${PORT:-3001}:${PORT:-3001}"`
+   - Changed WebSocket port from `"3002:3002"` to `"${WS_PORT:-3002}:${WS_PORT:-3002}"`
+   - Updated healthcheck URL from hardcoded `localhost:3001` to `localhost:${PORT:-3001}`
+   - Updated environment variables to use `${PORT:-3001}` and `${WS_PORT:-3002}` syntax
+
+2. **Enhanced .env.production template** by adding `WS_PORT=3002` variable
+
+3. **Updated PORT_CONFIGURATION.md** documentation to reflect simplified process
+
+**Technical Impact:**
+- No more manual editing of docker-compose.yml required for port changes
+- All port configurations now centralized in .env file
+- Healthcheck automatically adapts to custom ports
+- Simplified deployment process for different environments
+- Consistent environment variable usage across all services
+
+**Files Modified:**
+- `docker-compose.yml` - All port references now use environment variables
+- `.env.production` - Added `WS_PORT=3002` variable
+- `PORT_CONFIGURATION.md` - Updated documentation with simplified commands
+
 ## Environment Files Clarification - August 13, 2025 (18:02 WIB)
 
 ### 🔧 Resolved .env vs .env.production Confusion
