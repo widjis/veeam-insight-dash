@@ -45,12 +45,12 @@ http {
 
     # Upstream Backend
     upstream backend {
-        server veeam-insight:3001;
+        server ${BACKEND_HOST}:${BACKEND_PORT};
     }
 
     # Upstream WebSocket
     upstream websocket {
-        server veeam-insight:3002;
+        server ${WEBSOCKET_HOST}:${WEBSOCKET_PORT};
     }
 
     # HTTP Server (No SSL)

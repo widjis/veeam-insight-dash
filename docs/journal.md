@@ -1,5 +1,99 @@
 # Veeam Insight Dashboard - Development Journal
 
+## Nginx Configuration Refactoring with Environment Variables - August 13, 2025 (22:09 WIB)
+
+### 🔧 Refactored Nginx Configuration to Use Environment Variables
+
+**Enhancement Implemented:**
+- **Dynamic Configuration**: Replaced hardcoded server addresses with environment variables
+- **Improved Maintainability**: Configuration now supports different environments without code changes
+- **Template-based Approach**: Implemented nginx configuration template with envsubst processing
+
+**Changes Made:**
+1. **✅ Nginx Configuration Template**:
+   - Renamed `nginx-http.conf` to `nginx-http.conf.template`
+   - Replaced hardcoded values with variables: `${BACKEND_HOST}:${BACKEND_PORT}` and `${WEBSOCKET_HOST}:${WEBSOCKET_PORT}`
+
+2. **✅ Environment Variables**:
+   - Added `BACKEND_HOST=veeam-insight`, `BACKEND_PORT=3003` to `.env` and `.env.production`
+   - Added `WEBSOCKET_HOST=veeam-insight`, `WEBSOCKET_PORT=3002` to environment files
+   - Updated `docker-compose.yml` to pass variables to nginx container
+
+3. **✅ Nginx Entrypoint Script**:
+   - Created `nginx-entrypoint.sh` to process template with `envsubst`
+   - Added configuration validation before starting nginx
+   - Set executable permissions on the script
+
+4. **✅ Docker Compose Updates**:
+   - Modified nginx service to use template and entrypoint script
+   - Added environment variable defaults with fallback values
+
+**Files Modified:**
+- `nginx-http.conf` → `nginx-http.conf.template`: Template with environment variables
+- `nginx-entrypoint.sh`: New script for template processing
+- `docker-compose.yml`: Updated nginx service configuration
+- `.env` and `.env.production`: Added nginx upstream variables
+
+**Benefits:**
+- Easy configuration changes without modifying nginx config files
+- Support for different environments (dev, staging, production)
+- Centralized configuration management through environment variables
+- Improved deployment flexibility
+
+---
+
+## WebSocket Port Mismatch Resolution - August 13, 2025 (22:06 WIB)
+
+### 🔧 Fixed WebSocket Connection Port Mismatch
+
+**Issue Identified:**
+- **WebSocket Connection Error**: Frontend attempting to connect to `ws://localhost:3001/socket.io/` instead of production server
+- **Port Mismatch**: Nginx upstream backend configured for port 3001, but backend actually runs on port 3003
+- **Environment Variable Issue**: Frontend built with old environment variables, hardcoded localhost:3001
+
+**Root Cause Analysis:**
+1. **Nginx Configuration**: Upstream backend pointing to wrong port (3001 vs 3003)
+2. **Frontend Build**: Application built with outdated environment variables
+3. **Docker Environment**: Frontend environment variables not properly injected during build
+
+**Solution Implemented:**
+1. **✅ Fixed Nginx Configuration**:
+   - Updated `nginx-http.conf` upstream backend from `veeam-insight:3001` to `veeam-insight:3003`
+   - Verified WebSocket upstream correctly configured for port 3002
+   - Confirmed `/socket.io/` location block properly proxies to backend
+
+2. **✅ Environment Configuration**:
+   - Verified `.env` and `.env.production` have correct `VITE_WS_URL=http://10.60.10.59:9007`
+   - Confirmed backend `PORT=3003` and `WS_PORT=3002` settings
+
+**Files Modified:**
+- `nginx-http.conf`: Updated upstream backend port from 3001 to 3003
+
+**⚠️ Next Steps Required (Production Server):**
+**IMPORTANT**: The following commands must be run on the production server where Docker is available:
+
+```bash
+# Option 1: Using deploy script
+./deploy.sh --restart
+
+# Option 2: Manual Docker commands
+docker-compose down
+docker-compose build --no-cache
+docker-compose up -d
+
+# Option 3: If using newer Docker syntax
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+```
+
+**Technical Notes:**
+- Frontend WebSocket URL is set during build time, requiring container rebuild
+- Nginx configuration changes require service restart to take effect
+- Environment variables must be properly configured before building frontend
+
+---
+
 ## Authentication & WebSocket Connection Issues Resolution - August 13, 2025 (21:47 WIB)
 
 ### 🔧 Fixed Login Authentication and WebSocket Connection Errors

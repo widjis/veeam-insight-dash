@@ -73,13 +73,19 @@ services:
       - "${HTTP_PORT:-9007}:80"
       - "${HTTPS_PORT:-9008}:443"
     volumes:
-      # Use HTTP-only config by default (change to nginx.conf for HTTPS)
-      - ./nginx-http.conf:/etc/nginx/nginx.conf:ro
+      # Use HTTP-only config template (change to nginx.conf.template for HTTPS)
+      - ./nginx-http.conf.template:/etc/nginx/nginx.conf.template:ro
+      - ./nginx-entrypoint.sh:/docker-entrypoint.sh:ro
       - ./ssl:/etc/nginx/ssl:ro
       # Mount frontend build files from the main container
       - frontend-dist:/usr/share/nginx/html:ro
     environment:
       - ENABLE_SSL=${ENABLE_SSL:-false}
+      - BACKEND_HOST=${BACKEND_HOST:-veeam-insight}
+      - BACKEND_PORT=${BACKEND_PORT:-3003}
+      - WEBSOCKET_HOST=${WEBSOCKET_HOST:-veeam-insight}
+      - WEBSOCKET_PORT=${WEBSOCKET_PORT:-3002}
+    entrypoint: ["/docker-entrypoint.sh"]
     networks:
       - veeam-network
     depends_on:
