@@ -8,13 +8,13 @@ services:
     container_name: veeam-insight-dashboard
     restart: unless-stopped
     ports:
-      - "3001:3001"
-      - "3002:3002"
+      - "${PORT:-3001}:${PORT:-3001}"
+      - "${WS_PORT:-3002}:${WS_PORT:-3002}"
     environment:
       # Application Configuration
       - NODE_ENV=production
-      - PORT=3001
-      - WS_PORT=3002
+      - PORT=${PORT:-3001}
+      - WS_PORT=${WS_PORT:-3002}
       
       # Veeam Configuration
       - VEEAM_SERVER=${VEEAM_SERVER}
@@ -55,7 +55,7 @@ services:
     networks:
       - veeam-network
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3001/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:${PORT:-3001}/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
       interval: 30s
       timeout: 10s
       retries: 3

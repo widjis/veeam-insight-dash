@@ -1,5 +1,149 @@
 # Veeam Insight Dashboard - Development Journal
 
+## Environment Files Clarification - August 13, 2025 (18:02 WIB)
+
+### 🔧 Resolved .env vs .env.production Confusion
+
+**Issue Identified:**
+- User confused about which environment file is actually used in production
+- Documentation mentions "copy .env.production to .env" but unclear why
+- Inconsistent behavior suggesting wrong file being used
+
+**Root Cause Analysis:**
+- Docker Compose reads from `.env` file in project root
+- `.env.production` is just a template/reference file
+- Application uses `dotenv.config()` but no .env files are copied into Docker container
+- Environment variables passed via Docker Compose using `${VARIABLE_NAME}` syntax
+
+**Solution Implemented:**
+
+1. **Created ENVIRONMENT_FILES_GUIDE.md** with comprehensive explanation:
+   - Clear distinction between template (.env.production) vs actual (.env) files
+   - Docker Compose environment variable flow explanation
+   - File structure recommendations with security best practices
+   - Step-by-step setup commands for production
+
+2. **Environment Variable Priority Clarified:**
+   - Docker Compose environment section (highest)
+   - Container environment variables
+   - Host .env file (via Docker Compose)
+   - Application defaults (environment.ts)
+
+**Technical Impact:**
+- Eliminates confusion about environment file usage
+- Provides clear production deployment process
+- Ensures proper security practices for credential management
+
+**Files Created:**
+- `ENVIRONMENT_FILES_GUIDE.md` - Complete environment files explanation
+
+**Action Required:**
+- User needs to copy `.env.production` to `.env` and edit with real values
+- Restart Docker containers to use correct environment file
+
+---
+
+## Port Configuration Guide - August 13, 2025 (18:00 WIB)
+
+### 🔧 Created Comprehensive Port Configuration Guide
+
+**Issue Identified:**
+- User reported port 3001 not available in production environment
+- Need easy way to change ports for deployment flexibility
+- Confusion about internal vs external port configuration
+
+**Solution Implemented:**
+
+1. **Created PORT_CONFIGURATION.md** with comprehensive guide:
+   - Clear explanation of current port architecture
+   - Two configuration options: external ports only (recommended) vs full internal port change
+   - Step-by-step instructions with actual commands
+   - Port conflict resolution guidance
+   - Common configurations for different environments
+
+2. **Port Architecture Explained:**
+   - **External ports** (HTTP_PORT=9007, HTTPS_PORT=9008): What users access
+   - **Internal ports** (3001, 3002): Used inside Docker containers
+   - **Direct ports** (3001, 3002): Exposed for development access
+
+3. **Easy Configuration Options:**
+   - **Option 1** (Recommended): Change only external ports in `.env.production`
+   - **Option 2** (Advanced): Change internal ports if conflicts exist
+   - Provided sed commands for bulk port changes
+
+**Technical Impact:**
+- Users can now easily resolve port conflicts
+- Clear separation between development and production port configurations
+- Reduced deployment complexity with simple environment variable changes
+
+**Files Created:**
+- `PORT_CONFIGURATION.md` - Complete port configuration guide
+
+**Access URLs:**
+- Default: `http://localhost:9007` (HTTP), `https://localhost:9008` (HTTPS)
+- Customizable via HTTP_PORT and HTTPS_PORT environment variables
+
+---
+
+## SSL Configuration Options - August 13, 2025 (17:54 WIB)
+
+### 🔧 Implemented Flexible HTTP/HTTPS Configuration
+
+**Issue Identified:**
+- User requested option to use both HTTP and HTTPS instead of forced HTTPS
+- Docker build failing due to missing SSL certificates
+- Nginx configuration forcing HTTPS redirect causing startup errors
+
+**Changes Implemented:**
+
+1. **Created HTTP-only nginx configuration** (`nginx-http.conf`):
+   - Removed SSL requirements and HTTPS redirect
+   - Maintains all security headers and proxy configurations
+   - Supports WebSocket and API proxying over HTTP
+   - Includes rate limiting and caching rules
+
+2. **Updated .env.production** with SSL configuration options:
+   - `ENABLE_SSL=false` (default for HTTP-only operation)
+   - `SSL_CERT_PATH` and `SSL_KEY_PATH` variables for certificate paths
+   - `HTTP_PORT=9007` and `HTTPS_PORT=9008` for port configuration
+
+3. **Modified docker-compose.yml**:
+   - Uses `nginx-http.conf` by default for HTTP-only operation
+   - Environment variable support for dynamic port configuration
+   - Clear instructions for switching to HTTPS mode
+
+4. **Generated development SSL certificates**:
+   - Created `ssl/cert.pem` and `ssl/key.pem` using OpenSSL
+   - Self-signed certificates valid for 365 days
+   - Ready for development HTTPS testing
+
+5. **Created comprehensive documentation** (`SSL_CONFIGURATION.md`):
+   - Step-by-step guide for switching between HTTP and HTTPS
+   - Security considerations and best practices
+   - Troubleshooting section for common issues
+   - Production deployment recommendations
+
+**Technical Impact:**
+- ✅ Default configuration now uses HTTP only (port 9007)
+- ✅ No SSL certificate errors on Docker startup
+- ✅ Easy switching between HTTP and HTTPS modes
+- ✅ Maintains security headers even in HTTP mode
+- ✅ Self-signed certificates available for development HTTPS
+- ✅ Flexible port configuration via environment variables
+
+**Files Modified:**
+- `nginx.conf` - Updated HTTPS server configuration (removed deprecated http2)
+- `.env.production` - Added SSL configuration section
+- `docker-compose.yml` - Updated nginx volume mapping and port variables
+- **Created**: `nginx-http.conf`, `SSL_CONFIGURATION.md`
+- **Created**: `ssl/cert.pem`, `ssl/key.pem`
+
+**Access URLs:**
+- **HTTP (Default)**: http://localhost:9007
+- **HTTPS (Optional)**: https://localhost:9008
+
+---
+
 ## Additional TypeScript Fixes - August 13, 2025 (17:39 WIB)
 
 ### 🔧 Resolved Remaining Dashboard Route Errors
