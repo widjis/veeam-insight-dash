@@ -1252,6 +1252,76 @@ Internet → Nginx (SSL/443) → Veeam Insight (3001) → Redis (6379)
 
 **Last Updated**: Wed Aug 13 14:42:45 WIB 2025
 
+## 🔄 External Redis Integration Update
+**Date**: Wed Aug 13 14:48:32 WIB 2025
+**Type**: Configuration Update
+**Status**: ✅ Complete
+
+### Overview
+Updated production Docker deployment configuration to use existing external Redis instance instead of deploying a separate Redis container. This optimizes resource usage and leverages existing Redis infrastructure.
+
+### Changes Made
+
+#### 1. **docker-compose.yml** - External Redis Configuration
+- **Removed**: Internal Redis service and volume
+- **Updated**: Application environment to use `host.docker.internal:6379`
+- **Added**: `extra_hosts` configuration for container-to-host communication
+- **Removed**: Redis dependency from application service
+
+#### 2. **.env.production** - Redis Connection Settings
+- **Updated**: `REDIS_URL` to point to `redis://localhost:6379`
+- **Updated**: `REDIS_HOST` to `localhost`
+- **Simplified**: Removed Docker-specific Redis configuration
+- **Maintained**: All other Redis settings (port, password, database, TTL)
+
+#### 3. **PRODUCTION_DEPLOYMENT.md** - Documentation Updates
+- **Updated**: Architecture overview to reflect external Redis
+- **Added**: External Redis configuration requirements
+- **Updated**: Management commands for external Redis access
+- **Added**: Redis connectivity testing procedures
+- **Updated**: Troubleshooting section for external Redis issues
+
+#### 4. **deploy.sh** - Deployment Script Updates
+- **Added**: External Redis connectivity check during prerequisites
+- **Updated**: Status display to show external Redis connection
+- **Updated**: Management commands to use external Redis CLI
+- **Enhanced**: Error handling for Redis connection failures
+
+### External Redis Requirements
+- **Host**: localhost (accessible from Docker containers via host.docker.internal)
+- **Port**: 6379 (default Redis port)
+- **Configuration**: AOF persistence enabled, appropriate memory settings
+- **Connectivity**: Must be accessible from Docker containers
+
+### Architecture Update
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│     Nginx       │────│  Veeam Insight  │────│  External Redis │
+│  (Port 80/443)  │    │   (Port 3000)   │    │  (Port 6379)    │
+│   Reverse Proxy │    │   Application    │    │   Host System   │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │                       │
+         └───────────────────────┼───────────────────────┘
+                                 │
+                    ┌─────────────────┐
+                    │  Docker Network │
+                    │   veeam-network │
+                    └─────────────────┘
+```
+
+### Benefits
+- ✅ **Resource Optimization**: No duplicate Redis containers
+- ✅ **Infrastructure Reuse**: Leverages existing Redis setup
+- ✅ **Simplified Management**: Single Redis instance to maintain
+- ✅ **Data Consistency**: Shared Redis data across applications
+- ✅ **Performance**: Reduced container overhead
+
+### Deployment Impact
+- **No Breaking Changes**: Existing functionality maintained
+- **Configuration Required**: Must update .env with correct Redis settings
+- **Connectivity Validation**: Deploy script checks Redis accessibility
+- **Documentation Updated**: All guides reflect external Redis setup
+
 ---
 
 *Last Updated: August 13, 2025*

@@ -58,19 +58,8 @@ check_prerequisites() {
         exit 1
     fi
     
-    # Check if external Redis is accessible
-    if command -v redis-cli >/dev/null 2>&1; then
-        if redis-cli -h localhost -p 6379 ping >/dev/null 2>&1; then
-            log_success "External Redis is accessible"
-        else
-            log_error "External Redis is not accessible at localhost:6379"
-            log_error "Please ensure your Redis service is running"
-            exit 1
-        fi
-    else
-        log_warning "Redis CLI not found - cannot verify Redis connectivity"
-        log_warning "Please ensure Redis is running at localhost:6379"
-    fi
+    # Note: Redis is not required for this application
+# The application uses in-memory caching
     
     log_success "Prerequisites check passed"
 }
@@ -237,14 +226,12 @@ show_status() {
     echo "Dashboard: https://localhost"
     echo "API Health: https://localhost/api/health"
     echo "Nginx Health: https://localhost/health"
-    echo "External Redis: localhost:6379"
     echo
     log_info "=== Useful Commands ==="
     echo "View logs: docker-compose logs -f"
     echo "Stop services: docker-compose down"
     echo "Restart services: docker-compose restart"
     echo "Update deployment: ./deploy.sh"
-    echo "Redis CLI: redis-cli -h localhost -p 6379"
     echo
 }
 

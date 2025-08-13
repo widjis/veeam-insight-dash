@@ -29,7 +29,6 @@ services:
       - JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN:-7d}
       
       # Cache Configuration
-      - REDIS_URL=${REDIS_URL}
       - CACHE_TTL=${CACHE_TTL:-300}
       
       # Rate Limiting
@@ -50,11 +49,6 @@ services:
       # Logging
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - LOG_FILE=${LOG_FILE:-/app/logs/app.log}
-      
-      # External Redis
-      - REDIS_HOST=${REDIS_HOST}
-      - REDIS_PORT=${REDIS_PORT:-6379}
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
     volumes:
       - ./logs:/app/logs
       - ./server/tokens.json:/app/tokens.json
