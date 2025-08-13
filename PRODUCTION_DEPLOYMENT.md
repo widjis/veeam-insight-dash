@@ -246,16 +246,19 @@ docker-compose up -d --build
 docker-compose up -d --scale veeam-insight=3
 ```
 
-### Database Operations
+### External Redis Operations
 ```bash
-# Redis CLI access
-docker-compose exec redis redis-cli
+# Redis CLI access (connect to your external Redis)
+redis-cli -h localhost -p 6379
 
 # Clear cache
-docker-compose exec redis redis-cli FLUSHALL
+redis-cli -h localhost -p 6379 FLUSHALL
 
 # Monitor Redis
-docker-compose exec redis redis-cli MONITOR
+redis-cli -h localhost -p 6379 MONITOR
+
+# Test Redis connectivity from container
+docker-compose exec veeam-insight redis-cli -h host.docker.internal ping
 ```
 
 ## 🚨 Troubleshooting
@@ -293,13 +296,19 @@ curl -k https://localhost/api/metrics
 docker-compose logs veeam-insight | grep ERROR
 ```
 
-#### 4. Redis Connection Issues
+#### 4. External Redis Connection Issues
 ```bash
-# Test Redis connectivity
-docker-compose exec veeam-insight redis-cli -h redis ping
+# Test Redis connectivity from container
+docker-compose exec veeam-insight redis-cli -h host.docker.internal ping
+
+# Test Redis connectivity from host
+redis-cli -h localhost ping
+
+# Check Redis service status
+sudo systemctl status redis-server
 
 # Check Redis logs
-docker-compose logs redis
+sudo journalctl -u redis-server -f
 ```
 
 ### Log Analysis
@@ -316,10 +325,29 @@ grep "401\|403" /var/log/nginx/access.log
 
 ## 🔧 Advanced Configuration
 
-### External Redis
-To use external Redis, modify `.env`:
+### External Redis Configuration
+
+The application is configured to use your existing Redis instance for:
+- API response caching
+- Session management
+- Rate limiting
+- WebSocket state management
+
+**Ensure your Redis instance has:**
 ```bash
-# Comment out Redis service in docker-compose.yml
+# Recommended Redis configuration
+maxmemory 512mb
+maxmemory-policy allkeys-lru
+appendonly yes
+```
+
+**Connection Details:**
+- Host: localhost (from Docker container perspective: host.docker.internal)
+- Port: 6379 (default)
+- Database: 0 (default)
+
+To modify Redis connection, update `.env`:
+```bash
 # Update environment variables
 REDIS_HOST=your-redis-server.com
 REDIS_PORT=6379

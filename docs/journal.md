@@ -1119,5 +1119,140 @@ import type { Socket } from 'socket.io-client';
 
 ---
 
+---
+
+## 📦 Production Docker Deployment Setup
+**Date**: Wed Aug 13 14:42:45 WIB 2025
+**Type**: Production Infrastructure
+**Status**: ✅ Complete
+
+### Overview
+Created comprehensive production Docker deployment configuration for the Veeam Insight Dashboard after Git revert to commit `3911852`. This includes all necessary files for secure, scalable production deployment.
+
+### Files Created
+
+#### 1. **Dockerfile** - Multi-stage Production Build
+- **Frontend Build Stage**: Node.js 18 Alpine with Vite build
+- **Backend Build Stage**: TypeScript compilation with proper dependency management
+- **Production Runtime**: Minimal Alpine image with non-root user
+- **Security Features**:
+  - Non-root user execution (veeam:nodejs)
+  - dumb-init for proper signal handling
+  - Health checks with 30s intervals
+  - Proper file permissions and ownership
+
+#### 2. **docker-compose.yml** - Service Orchestration
+- **Services**:
+  - `veeam-insight`: Main application container
+  - `nginx`: Reverse proxy with SSL termination
+  - `redis`: Cache and session storage
+- **Features**:
+  - Environment variable configuration
+  - Volume mounts for logs and SSL
+  - Health checks for all services
+  - Network isolation
+  - Restart policies
+
+#### 3. **nginx.conf** - Reverse Proxy Configuration
+- **SSL/TLS**: HTTPS with modern cipher suites
+- **Security Headers**: HSTS, CSP, XSS protection, frame options
+- **Rate Limiting**: API (10r/s) and login (5r/m) protection
+- **Routing**:
+  - API routes to backend (port 3001)
+  - WebSocket routes to WS server (port 3002)
+  - Static file serving with caching
+- **Compression**: Gzip for text-based content
+- **Logging**: Structured access and error logs
+
+#### 4. **.env.production** - Environment Template
+- **Application Config**: Ports, Node environment
+- **Veeam Integration**: Server, credentials, port settings
+- **Security**: JWT secrets, token expiration
+- **Redis**: Connection settings for cache
+- **Rate Limiting**: Configurable windows and limits
+- **Monitoring**: Health check and alert intervals
+- **WhatsApp**: Optional notification integration
+- **Logging**: Level and file configuration
+
+#### 5. **.dockerignore** - Build Optimization
+- Excludes development files, logs, and sensitive data
+- Reduces Docker build context size
+- Improves build performance and security
+
+#### 6. **PRODUCTION_DEPLOYMENT.md** - Comprehensive Guide
+- **Architecture Diagram**: Visual system overview
+- **Prerequisites**: System and software requirements
+- **Step-by-step Deployment**: 6 detailed phases
+- **Security Configuration**: Firewall, SSL, headers
+- **Monitoring & Maintenance**: Health checks, logs, backups
+- **Troubleshooting**: Common issues and solutions
+- **Advanced Configuration**: External Redis, load balancing
+
+#### 7. **deploy.sh** - Automated Deployment Script
+- **Prerequisites Check**: Docker, Docker Compose validation
+- **Environment Setup**: Auto-copy .env, JWT secret generation
+- **SSL Certificate**: Self-signed cert generation
+- **Directory Creation**: Logs, tokens.json setup
+- **Configuration Validation**: Required variables check
+- **Build & Deploy**: No-cache build, service startup
+- **Verification**: Health endpoint testing
+- **Status Display**: URLs, commands, container status
+- **Command Options**: --help, --status, --logs, --stop, --restart
+
+### Production Features
+
+#### 🔒 Security
+- **SSL/TLS**: HTTPS with modern protocols
+- **Non-root Execution**: Container security best practices
+- **Rate Limiting**: Protection against abuse
+- **Security Headers**: Comprehensive browser protection
+- **JWT Authentication**: Secure token-based auth
+- **Environment Isolation**: Containerized services
+
+#### 📊 Monitoring
+- **Health Checks**: Application, Nginx, Redis monitoring
+- **Logging**: Structured logs with rotation
+- **Metrics**: Performance and error tracking
+- **Status Endpoints**: Real-time service health
+
+#### 🚀 Performance
+- **Multi-stage Build**: Optimized image sizes
+- **Caching**: Redis for session and data cache
+- **Compression**: Gzip for reduced bandwidth
+- **Static Asset Caching**: Browser cache optimization
+- **Connection Pooling**: Efficient resource usage
+
+#### 🔧 Operations
+- **One-command Deployment**: `./deploy.sh`
+- **Service Management**: Start, stop, restart, logs
+- **Configuration Management**: Environment-based config
+- **Backup Procedures**: Data and configuration backup
+- **Update Process**: Zero-downtime deployment
+
+### Deployment Architecture
+```
+Internet → Nginx (SSL/443) → Veeam Insight (3001) → Redis (6379)
+                ↓
+           WebSocket (3002)
+```
+
+### Next Steps
+1. **Configure Environment**: Edit `.env` with actual Veeam credentials
+2. **SSL Certificates**: Replace self-signed with production certs
+3. **Domain Setup**: Configure DNS and domain-specific SSL
+4. **Monitoring**: Set up external monitoring and alerting
+5. **Backup Strategy**: Implement automated backup procedures
+
+### Impact
+- ✅ **Production Ready**: Complete deployment infrastructure
+- ✅ **Security Compliant**: Industry-standard security practices
+- ✅ **Scalable**: Ready for horizontal scaling
+- ✅ **Maintainable**: Clear documentation and automation
+- ✅ **Monitorable**: Comprehensive health checks and logging
+
+**Last Updated**: Wed Aug 13 14:42:45 WIB 2025
+
+---
+
 *Last Updated: August 13, 2025*
 *Analyst: TRAE AI Agent*

@@ -29,7 +29,7 @@ services:
       - JWT_REFRESH_EXPIRES_IN=${JWT_REFRESH_EXPIRES_IN:-7d}
       
       # Cache Configuration
-      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+      - REDIS_URL=${REDIS_URL}
       - CACHE_TTL=${CACHE_TTL:-300}
       
       # Rate Limiting
@@ -51,7 +51,7 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - LOG_FILE=${LOG_FILE:-/app/logs/app.log}
       
-      # External Redis (comment out if using internal Redis)
+      # External Redis
       - REDIS_HOST=${REDIS_HOST}
       - REDIS_PORT=${REDIS_PORT:-6379}
       - REDIS_PASSWORD=${REDIS_PASSWORD}
@@ -66,8 +66,8 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    depends_on:
-      - redis
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   nginx:
     image: nginx:alpine
@@ -88,28 +88,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
-  # Redis service (comment out if using external Redis)
-  redis:
-    image: redis:7-alpine
-    container_name: veeam-insight-redis
-    restart: unless-stopped
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - veeam-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    command: redis-server --appendonly yes
-
-volumes:
-  redis_data:
-    driver: local
 
 networks:
   veeam-network:
