@@ -87,6 +87,8 @@ export interface AlertRule {
     whatsapp?: boolean;
     whatsappRecipients?: string[];
     webhook?: string;
+    resendInterval?: number; // minutes
+    maxResends?: number;
   };
 }
 

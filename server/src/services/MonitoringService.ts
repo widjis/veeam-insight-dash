@@ -189,20 +189,60 @@ export class MonitoringService {
     try {
       logger.debug('Performing health check...');
 
+      // Perform individual health checks with detailed error tracking
+      const healthResults = {
+        veeam: { healthy: false, error: '' },
+        cache: { healthy: false, error: '' },
+        websocket: { healthy: false, error: '' }
+      };
+
+      // Check Veeam service health
+      try {
+        healthResults.veeam.healthy = await this.veeamService.healthCheck();
+        if (!healthResults.veeam.healthy) {
+          healthResults.veeam.error = 'Veeam API connectivity failed - check authentication, network connection, or service availability';
+        }
+      } catch (error) {
+        healthResults.veeam.healthy = false;
+        healthResults.veeam.error = `Veeam service error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
+
+      // Check Cache service health
+      try {
+        healthResults.cache.healthy = await this.cacheService.healthCheck();
+        if (!healthResults.cache.healthy) {
+          healthResults.cache.error = 'Cache service operations failed - check Redis connection or memory cache';
+        }
+      } catch (error) {
+        healthResults.cache.healthy = false;
+        healthResults.cache.error = `Cache service error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
+
+      // Check WebSocket service health
+      try {
+        const connectedClients = this.webSocketService.getConnectedClientsCount();
+        healthResults.websocket.healthy = connectedClients >= 0;
+        if (!healthResults.websocket.healthy) {
+          healthResults.websocket.error = 'WebSocket service unavailable - real-time updates may not work';
+        }
+      } catch (error) {
+        healthResults.websocket.healthy = false;
+        healthResults.websocket.error = `WebSocket service error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      }
+
       const healthCheck: HealthCheck = {
         service: 'veeam-dashboard',
         status: 'healthy',
         timestamp: new Date().toISOString(),
         details: {
-          veeam: await this.veeamService.healthCheck() ? 'healthy' : 'unhealthy',
-          cache: await this.cacheService.healthCheck() ? 'healthy' : 'unhealthy',
-          websocket: this.webSocketService.getConnectedClientsCount() >= 0 ? 'healthy' : 'unhealthy',
+          veeam: healthResults.veeam.healthy ? 'healthy' : 'unhealthy',
+          cache: healthResults.cache.healthy ? 'healthy' : 'unhealthy',
+          websocket: healthResults.websocket.healthy ? 'healthy' : 'unhealthy',
         },
       };
 
       // Determine overall health status
-      const allServicesHealthy = healthCheck.details ? 
-        Object.values(healthCheck.details).every(status => status === 'healthy') : true;
+      const allServicesHealthy = Object.values(healthResults).every(result => result.healthy);
       healthCheck.status = allServicesHealthy ? 'healthy' : 'unhealthy';
 
       // Cache health check result
@@ -211,10 +251,10 @@ export class MonitoringService {
       if (!allServicesHealthy) {
         logger.warn('Health check failed:', healthCheck.details);
         
-        // Create alert for unhealthy services
-        const unhealthyServices = Object.entries(healthCheck.details || {})
-          .filter(([, status]) => status === 'unhealthy')
-          .map(([service]) => service);
+        // Create detailed alert message with specific error information
+        const unhealthyServices = Object.entries(healthResults)
+          .filter(([, result]) => !result.healthy)
+          .map(([service, result]) => `${service}: ${result.error}`);
 
         const alert: Alert = {
           id: `health-check-${Date.now()}`,
@@ -222,10 +262,15 @@ export class MonitoringService {
           type: 'error',
           severity: 'high',
           title: 'Service Health Check Failed',
-          message: `The following services are unhealthy: ${unhealthyServices.join(', ')}`,
+          message: `Service health issues detected:\n\n${unhealthyServices.join('\n\n')}\n\nPlease check the affected services and their configurations.`,
           timestamp: new Date().toISOString(),
           acknowledged: false,
           resolved: false,
+          metadata: {
+            healthDetails: healthResults,
+            unhealthyCount: unhealthyServices.length,
+            totalServices: Object.keys(healthResults).length
+          }
         };
 
         await this.alertService.createAlert(alert);

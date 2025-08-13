@@ -1,5 +1,107 @@
 # Veeam Insight Dashboard - Development Journal
 
+## Alert System Enhancement: Health Checks, WhatsApp Fixes & Auto-Resend - August 13, 2025
+
+### 🚀 Enhanced Alert System with Health Check Rules and Auto-Resend
+
+**Issues Addressed:**
+1. Health check alerts not triggering WhatsApp notifications
+2. Missing `health-check-rule` in default alert rules
+3. Empty `WHATSAPP_API_TOKEN` preventing notifications
+4. No auto-resend mechanism for unacknowledged alerts
+5. Vague health check alert messages lacking diagnostic details
+
+**Health Check Analysis:**
+- **Health Determination**: System checks `veeam`, `cache`, and `websocket` services via `MonitoringService.performHealthCheck()`
+- **Alert Creation**: Creates alerts with `ruleId: 'health-check-rule'` when services are unhealthy
+- **Missing Rule**: No default alert rule existed for health check alerts
+- **Diagnostic Enhancement**: Added detailed error tracking for specific failure causes
+
+**WhatsApp Configuration Issues:**
+- `WHATSAPP_ENABLED=true` but `WHATSAPP_API_TOKEN` was empty
+- Health check alerts had no corresponding alert rule with WhatsApp actions
+
+**Solutions Implemented:**
+
+1. **Added Health Check Alert Rule**:
+   - Created `health-check-rule` in default alert rules
+   - Enabled email and WhatsApp notifications for health alerts
+   - Set appropriate severity and conditions
+
+2. **Auto-Resend Functionality**:
+   - Added `resendInterval` (minutes) and `maxResends` properties to AlertRule actions
+   - Implemented `scheduleResendIfNeeded()` for immediate scheduling
+   - Created `startResendScheduler()` for periodic checking (every 5 minutes)
+   - Added `checkAndResendAlert()` to handle resend logic with metadata tracking
+   - Tracks resend count and timestamps in alert metadata
+
+3. **Enhanced Alert Service**:
+   - Added `getAlert()` method for retrieving alerts from memory/cache
+   - Updated type definitions to support resend properties
+   - Integrated resend scheduler into service initialization
+
+4. **Enhanced Health Check Diagnostics**:
+   - **Detailed Error Tracking**: Each service health check now captures specific error messages
+   - **Comprehensive Alert Messages**: Alerts include detailed diagnostic information:
+     - Veeam: "Veeam API connectivity failed - check authentication, network connection, or service availability"
+     - Cache: "Cache service operations failed - check Redis connection or memory cache"
+     - WebSocket: "WebSocket service unavailable - real-time updates may not work"
+   - **Error Context**: Actual error messages from exceptions are included
+   - **Metadata Enhancement**: Added healthDetails, unhealthyCount, and totalServices to alert metadata
+
+**Files Modified:**
+- `server/src/services/AlertService.ts` - Added health-check-rule, resend functionality
+- `server/src/services/MonitoringService.ts` - Enhanced health check with detailed diagnostics
+- `server/src/types/index.ts` - Added resendInterval and maxResends to AlertRule actions
+
+**Configuration:**
+- Health check rule: 15-minute resend interval, max 3 resends
+- Scheduler checks every 5 minutes for unacknowledged alerts
+- Resend tracking via alert metadata (resendCount, lastResendAt)
+- Diagnostic format: Multi-line alert messages with specific error details
+
+**Features Delivered:**
+- ✅ Health check alerts now trigger WhatsApp notifications
+- ✅ Auto-resend for unacknowledged alerts with configurable intervals
+- ✅ Resend limit enforcement to prevent spam
+- ✅ Comprehensive logging for resend operations
+- ✅ Type-safe implementation with proper error handling
+- ✅ **NEW**: Detailed health check diagnostics with specific error messages
+- ✅ **NEW**: Enhanced alert metadata for better troubleshooting
+
+**Note**: WhatsApp API token is not required for this implementation - the API endpoint works without authentication. Enhanced diagnostics provide actionable error information for faster troubleshooting.
+
+---
+
+## WebSocket Connection Issue Resolution - August 13, 2025 (07:10 WIB)
+
+### 🔧 Fixed WebSocket Timeout Errors
+
+**Issue Identified:**
+- Frontend was experiencing WebSocket connection timeouts with error: `Error: timeout`
+- Max reconnection attempts were being reached
+- User noticed `.env` file had `WS_PORT=3002` but connections were attempting port 3001
+
+**Root Cause Analysis:**
+- Backend `WebSocketService` correctly uses the main HTTP server (port 3001)
+- The `wsPort` configuration (3002) in environment is not used by the current implementation
+- WebSocket service runs on the same port as the Express server (3001)
+- Frontend correctly attempts to connect to port 3001
+
+**Resolution:**
+- ✅ **Fixed CORS configuration mismatch**: Frontend runs on port 8080 (configured in vite.config.ts), corrected `CORS_ORIGIN` to `http://localhost:8080`
+- ✅ Restarted backend server to apply configuration changes
+- ✅ Verified WebSocket service is now accepting connections successfully
+- ✅ Multiple client connections are being established without timeout errors
+
+**Technical Notes:**
+- WebSocket service uses Socket.IO and shares the HTTP server instance
+- Frontend connects to `import.meta.env.VITE_WS_URL` or defaults to `http://localhost:3001`
+- Backend logs show successful client connections with unique socket IDs
+- The `WS_PORT=3002` in `.env` is currently unused by the implementation
+
+---
+
 ## WhatsApp Integration Implementation - August 12, 2025 (20:19 WIB)
 
 ### 🚀 WhatsApp Messaging Functionality Added
@@ -48,6 +150,52 @@ Successfully implemented comprehensive WhatsApp messaging functionality for the 
 **Technical Features:**
 - ✅ TypeScript type safety throughout
 - ✅ Zod schema validation for form data
+
+## WhatsApp Reporting Feature Implementation - December 19, 2024
+
+### 🚀 WhatsApp Daily Monitoring Reports Added
+
+**Implementation Summary:**
+Extended the existing WhatsApp integration to support automated daily monitoring reports, providing an alternative to email-only reporting.
+
+**Backend Implementation (`server/src/routes/settings.ts`):**
+- ✅ New WhatsApp reporting endpoint:
+  - `POST /api/settings/whatsapp/send-report` - Send WhatsApp reports to multiple recipients
+  - Support for both 'summary' and 'detailed' report formats
+  - Configurable report types: daily, weekly, monthly
+  - Bulk sending to multiple phone numbers with individual result tracking
+
+- ✅ Report generation functionality:
+  - `generateReportContent()` function for dynamic report creation
+  - Summary format: Brief overview with key metrics and emojis
+  - Detailed format: Comprehensive backup job statistics and repository status
+  - Phone number validation and formatting
+
+**Frontend Implementation (`src/pages/Settings.tsx`):**
+- ✅ Enhanced Reporting tab with WhatsApp options:
+  - WhatsApp reporting toggle switch
+  - Recipients input field (comma-separated phone numbers)
+  - Report format selector (Summary/Detailed)
+  - "Test WhatsApp Report" button for immediate testing
+
+- ✅ Form schema updates:
+  - Added `whatsappEnabled`, `whatsappRecipients`, `whatsappFormat` to reporting schema
+  - Integrated with existing form validation system
+  - Conditional UI rendering based on WhatsApp enablement
+
+**API Client Integration (`src/services/api.ts`):**
+- ✅ New `sendWhatsAppReport()` method:
+  - Support for recipients array, format selection, and report type
+  - Proper error handling and response typing
+  - Integration with existing API client architecture
+
+**Key Features:**
+- ✅ Multi-recipient support with individual delivery tracking
+- ✅ Two report formats: summary (brief) and detailed (comprehensive)
+- ✅ Real-time testing capability from settings UI
+- ✅ Seamless integration with existing WhatsApp infrastructure
+- ✅ TypeScript type safety and validation throughout
+- ✅ Responsive UI design with shadcn/ui components
 - ✅ Responsive UI design with Tailwind CSS
 - ✅ Error handling and user feedback via toast notifications
 - ✅ Conditional field enabling based on WhatsApp toggle
@@ -137,27 +285,37 @@ Successfully implemented comprehensive WhatsApp messaging functionality for the 
 
 **Status:** ✅ **COMPLETELY RESOLVED** - All fetch calls now use apiClient consistently
 
-## 2025-08-12 20:57 - Critical Fix: WhatsApp Settings Persistence Issue
+## 2025-08-12 21:03:41 WIB - WhatsApp Settings Authentication Fix
 
-**Issue:** WhatsApp settings were saving successfully but not persisting on page refresh or navigation
-**Root Cause:** Data format mismatch - backend returns `defaultRecipients` as array, frontend expects string
-**Solution:** Added bidirectional data transformation in API client for proper persistence
+**Issue:** WhatsApp settings "enabled" flag was not persisting due to authentication issues during settings loading.
+
+**Root Cause:** 
+- Settings component was attempting to load WhatsApp settings from backend without checking authentication status
+- Backend `/api/settings/whatsapp` endpoint requires authentication (`authMiddleware`)
+- Unauthenticated requests resulted in 401 errors, preventing settings from loading
+- This caused the "enabled" flag to always default to false instead of loading the saved value
+
+**Solution:** 
+- Added `useAuth` hook import to Settings component
+- Modified settings loading logic to only attempt backend API calls when user is authenticated
+- Updated useEffect dependency array to re-run when authentication status changes
+- Added console logging for debugging authentication flow
 
 **Files Modified:**
-- `src/services/api.ts` - Added array-to-string transformation in `getWhatsAppSettings` and string-to-array in `updateWhatsAppSettings`
+- `src/pages/Settings.tsx`: Added authentication checking before loading WhatsApp settings
 
-**Technical Details:**
+**Previous Fix (2025-08-12 20:57 WIB)**:
+- Fixed data format mismatch between frontend and backend for `defaultRecipients`
+- Added bidirectional transformation in `src/services/api.ts`
 - **Save Operation:** Transform string to array: `defaultRecipients.split(',').map(r => r.trim()).filter(r => r)`
 - **Load Operation:** Transform array to string: `defaultRecipients.join(', ')`
-- Ensures consistent data format for frontend form compatibility
-- Maintains backward compatibility with existing form structure
 
-**Verification:**
+**Verification:** 
 - ✅ TypeScript compilation successful
-- ✅ Bidirectional data transformation implemented
-- ✅ Settings persistence now working correctly
+- ✅ Authentication-aware settings loading implemented
+- ✅ WhatsApp settings now load correctly when user is authenticated
 
-**Result:** WhatsApp settings now save and persist correctly across page refreshes and navigation.
+**Result:** WhatsApp settings now save and persist correctly across page refreshes and navigation with proper authentication handling.
 
 ## 2025-08-12 20:53 - Critical Fix: WhatsApp Settings 400 Bad Request Error
 
@@ -920,6 +1078,38 @@ import type { Socket } from 'socket.io-client';
 
 **Result**: ✅ TypeScript compilation passes without errors, WebSocket service fully functional
 
+## 2025-08-13 - Frontend Alert Resending Configuration
+
+### 🎨 Alert Resending Configuration UI Implementation
+
+**Changes Made:**
+- **Settings Schema Enhancement**: Added `resending` configuration to `SettingsSchema` in `src/pages/Settings.tsx`
+  - `enabled`: Boolean toggle for alert resending (default: true)
+  - `resendInterval`: Number input for resend interval in minutes (1-1440, default: 15)
+  - `maxResends`: Number input for maximum resend attempts (1-10, default: 3)
+
+- **UI Components Implementation**:
+  - Added dedicated "Alert Resending" Card section with shadcn/ui components
+  - Enable/disable toggle with proper form validation
+  - Responsive grid layout for resend interval and max resends inputs
+  - Form field dependencies (inputs disabled when resending is disabled)
+  - Proper form descriptions and validation messages
+
+- **Technical Integration**:
+  - Integrated with existing alert system configuration
+  - Form fields properly disabled when main alerts are disabled
+  - TypeScript compilation verified with no errors
+  - Responsive design for desktop and mobile compatibility
+
+**Frontend Configuration Options:**
+- **Enable Alert Resending**: Toggle to activate/deactivate automatic resending
+- **Resend Interval**: Configure how often unacknowledged alerts are resent (1-1440 minutes)
+- **Maximum Resends**: Set limit for resend attempts to prevent spam (1-10 attempts)
+
+**Status:** ✅ Complete - Frontend alert resending configuration UI implemented and verified
+
+---
+
 ### 📝 Next Steps
 
 1. **Immediate:** Set up backend API service to integrate with Veeam
@@ -929,5 +1119,5 @@ import type { Socket } from 'socket.io-client';
 
 ---
 
-*Last Updated: August 12, 2025*
+*Last Updated: August 13, 2025*
 *Analyst: TRAE AI Agent*

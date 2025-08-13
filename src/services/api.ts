@@ -397,6 +397,26 @@ class ApiClient {
       };
     }
   }
+
+  async sendWhatsAppReport(data: {
+    recipients: string[];
+    format: 'summary' | 'detailed';
+    reportType?: 'daily' | 'weekly' | 'monthly';
+  }): Promise<ApiResponse<any>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.post(
+        '/api/settings/whatsapp/send-report',
+        data
+      );
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to send WhatsApp report',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
 }
 
 // Create and export a singleton instance

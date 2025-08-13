@@ -19,6 +19,7 @@ export class AlertService {
     this.webSocketService = webSocketService;
     this.cacheService = cacheService;
     this.loadDefaultAlertRules();
+    this.startResendScheduler();
     logger.info('Alert service initialized');
   }
 
@@ -72,6 +73,19 @@ export class AlertService {
           whatsapp: config.whatsappEnabled,
         },
       },
+      {
+        id: 'health-check-rule',
+        name: 'Health Check Alert',
+        type: 'error',
+        enabled: true,
+        conditions: {},
+        actions: {
+          email: true,
+          whatsapp: config.whatsappEnabled,
+          resendInterval: 15 * 60 * 1000, // Resend every 15 minutes if not acknowledged
+          maxResends: 3, // Maximum 3 resend attempts
+        },
+      },
     ];
 
     defaultRules.forEach(rule => {
@@ -111,17 +125,21 @@ export class AlertService {
   }
 
   public async getAlert(alertId: string): Promise<Alert | null> {
-    // Try to get from memory first
+    // First check in-memory cache
     const alert = this.alerts.get(alertId);
     if (alert) {
       return alert;
     }
 
-    // Try to get from cache
-    const cachedAlert = await this.cacheService.get<Alert>(`alert:${alertId}`);
-    if (cachedAlert) {
-      this.alerts.set(alertId, cachedAlert);
-      return cachedAlert;
+    // Then check cache service
+    try {
+      const cachedAlert = await this.cacheService.get<Alert>(`alert:${alertId}`);
+      if (cachedAlert) {
+        this.alerts.set(alertId, cachedAlert);
+        return cachedAlert;
+      }
+    } catch (error) {
+      logger.error(`Error retrieving alert ${alertId} from cache:`, error);
     }
 
     return null;
@@ -418,6 +436,9 @@ export class AlertService {
     } catch (error) {
       logger.error('Error sending notifications:', error);
     }
+    
+    // Schedule resend if configured
+    this.scheduleResendIfNeeded(alert, rule);
   }
 
   private async sendEmailNotification(alert: Alert): Promise<void> {
@@ -427,6 +448,11 @@ export class AlertService {
 
   private async sendWhatsAppNotification(alert: Alert): Promise<void> {
     try {
+      if (!config.whatsappApiUrl) {
+        logger.warn('WhatsApp API URL not configured');
+        return;
+      }
+
       // Format WhatsApp message
       const message = this.formatWhatsAppMessage(alert);
       
@@ -448,8 +474,7 @@ export class AlertService {
           const response = await fetch(`${config.whatsappApiUrl}/send-message`, {
               method: 'POST',
               headers: {
-                'Content-Type': 'application/json',
-                ...(config.whatsappApiToken && { 'Authorization': `Bearer ${config.whatsappApiToken}` })
+                'Content-Type': 'application/json'
               },
             body: JSON.stringify({
               to: normalizedNumber,
@@ -640,6 +665,83 @@ export class AlertService {
     if (alertsToRemove.length > 0) {
       logger.info(`Cleaned up ${alertsToRemove.length} old resolved alerts`);
     }
+  }
+
+  private scheduleResendIfNeeded(alert: Alert, rule: AlertRule): void {
+    if (rule.actions.resendInterval && rule.actions.maxResends) {
+      setTimeout(async () => {
+        await this.checkAndResendAlert(alert.id, rule);
+      }, rule.actions.resendInterval * 60 * 1000); // Convert minutes to milliseconds
+    }
+  }
+
+  private async checkAndResendAlert(alertId: string, rule: AlertRule): Promise<void> {
+    try {
+      const alert = await this.getAlert(alertId);
+      
+      if (!alert || alert.acknowledged || alert.resolved) {
+        return; // Alert no longer exists, is acknowledged, or resolved
+      }
+
+      // Check if we haven't exceeded max resends
+      const resendCount = alert.metadata?.resendCount || 0;
+      if (resendCount >= (rule.actions.maxResends || 0)) {
+        logger.info(`Max resends reached for alert: ${alertId}`);
+        return;
+      }
+
+      // Update resend count
+      alert.metadata = {
+        ...alert.metadata,
+        resendCount: resendCount + 1,
+        lastResendAt: new Date().toISOString()
+      };
+
+      // Update in memory and cache
+      this.alerts.set(alertId, alert);
+      await this.cacheService.set(`alert:${alertId}`, alert, 24 * 60 * 60);
+
+      // Resend notifications
+      await this.sendNotifications(alert, rule);
+      
+      logger.info(`Alert resent (${resendCount + 1}/${rule.actions.maxResends}): ${alertId}`);
+    } catch (error) {
+      logger.error(`Error checking/resending alert ${alertId}:`, error);
+    }
+  }
+
+  public async startResendScheduler(): Promise<void> {
+    // Check for unacknowledged alerts every 5 minutes
+    setInterval(async () => {
+      try {
+        const alerts = Array.from(this.alerts.values());
+        const unacknowledgedAlerts = alerts.filter(alert => 
+          !alert.acknowledged && !alert.resolved
+        );
+
+        for (const alert of unacknowledgedAlerts) {
+          const rule = this.alertRules.get(alert.ruleId);
+          if (rule && rule.actions.resendInterval && rule.actions.maxResends) {
+            const resendCount = alert.metadata?.resendCount || 0;
+            const lastResendAt = alert.metadata?.lastResendAt;
+            
+            // Check if it's time to resend
+             if (resendCount < rule.actions.maxResends) {
+               const lastSentTime = lastResendAt ? new Date(lastResendAt) : new Date(alert.timestamp);
+               const timeSinceLastSend = Date.now() - lastSentTime.getTime();
+               
+               if (timeSinceLastSend >= rule.actions.resendInterval * 60 * 1000) {
+                 await this.checkAndResendAlert(alert.id, rule);
+               }
+             }
+          }
+        }
+      } catch (error) {
+        logger.error('Error in resend scheduler:', error);
+      }
+    }, 5 * 60 * 1000); // Check every 5 minutes
+    
+    logger.info('Alert resend scheduler started');
   }
 
   public shutdown(): void {

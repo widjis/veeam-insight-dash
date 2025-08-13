@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/form"
 import { useToast } from "@/hooks/use-toast"
 import { apiClient } from "@/services/api"
+import { useAuth } from "@/contexts/AuthContext"
 
 const SettingsSchema = z.object({
   alerts: z.object({
@@ -45,6 +46,11 @@ const SettingsSchema = z.object({
       repoWarn: z.coerce.number().min(50).max(99),
       repoCritical: z.coerce.number().min(60).max(100),
       longRunningMinutes: z.coerce.number().min(1).max(1440),
+    }),
+    resending: z.object({
+      enabled: z.boolean().default(true),
+      resendInterval: z.coerce.number().min(1).max(1440).default(15),
+      maxResends: z.coerce.number().min(1).max(10).default(3),
     }),
     channels: z.object({
       email: z.boolean().default(true),
@@ -70,6 +76,9 @@ const SettingsSchema = z.object({
     timezone: z.string().default("UTC"),
     format: z.enum(["html", "pdf", "csv"]).default("html"),
     recipients: z.string().optional().default(""),
+    whatsappEnabled: z.boolean().default(false),
+    whatsappRecipients: z.string().optional().default(""),
+    whatsappFormat: z.enum(["summary", "detailed"]).default("summary"),
   }),
   general: z.object({
     pollIntervalSec: z.coerce.number().min(10).max(3600).default(60),
@@ -87,6 +96,11 @@ const DEFAULT_SETTINGS: SettingsValues = {
       repoWarn: 80,
       repoCritical: 90,
       longRunningMinutes: 60,
+    },
+    resending: {
+      enabled: true,
+      resendInterval: 15,
+      maxResends: 3,
     },
     channels: {
       email: true,
@@ -112,6 +126,9 @@ const DEFAULT_SETTINGS: SettingsValues = {
     timezone: "UTC",
     format: "html",
     recipients: "ops@example.com, backup@example.com",
+    whatsappEnabled: false,
+    whatsappRecipients: "",
+    whatsappFormat: "summary",
   },
   general: {
     pollIntervalSec: 60,
@@ -123,6 +140,7 @@ const STORAGE_KEY = "veeam-settings"
 
 const Settings = () => {
   const { toast } = useToast()
+  const { isAuthenticated } = useAuth()
 
   const form = useForm<SettingsValues>({
     resolver: zodResolver(SettingsSchema),
@@ -171,19 +189,23 @@ const Settings = () => {
         }
       }
       
-      // Load WhatsApp settings from backend
-      try {
-        console.log('Loading WhatsApp settings from backend...')
-        const result = await apiClient.getWhatsAppSettings()
-        console.log('WhatsApp settings result:', result)
-        if (result.success && result.data) {
-          console.log('WhatsApp settings data:', result.data)
-          settings.whatsapp = result.data
-        } else {
-          console.error('Failed to load WhatsApp settings:', result.error)
+      // Load WhatsApp settings from backend only if authenticated
+      if (isAuthenticated) {
+        try {
+          console.log('Loading WhatsApp settings from backend...')
+          const result = await apiClient.getWhatsAppSettings()
+          console.log('WhatsApp settings result:', result)
+          if (result.success && result.data) {
+            console.log('WhatsApp settings data:', result.data)
+            settings.whatsapp = result.data
+          } else {
+            console.error('Failed to load WhatsApp settings:', result.error)
+          }
+        } catch (error) {
+          console.error('Failed to load WhatsApp settings:', error)
         }
-      } catch (error) {
-        console.error('Failed to load WhatsApp settings:', error)
+      } else {
+        console.log('User not authenticated, skipping WhatsApp settings load')
       }
       
       console.log('Final settings before form reset:', settings)
@@ -192,7 +214,7 @@ const Settings = () => {
     
     loadSettings()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [isAuthenticated])
 
   const handleTestAlerts = async () => {
     try {
@@ -293,6 +315,59 @@ const Settings = () => {
       toast({
         title: "Error",
         description: "Failed to test WhatsApp connection",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleTestWhatsAppReport = async () => {
+    try {
+      const reportFormat = form.watch("reporting.whatsappFormat")
+      const recipients = form.watch("reporting.whatsappRecipients")
+      
+      if (!recipients || recipients.trim() === "") {
+        toast({
+          title: "Error",
+          description: "Please add WhatsApp recipients first",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Parse recipients (comma-separated phone numbers)
+      const recipientList = recipients.split(',').map(r => r.trim()).filter(r => r.length > 0)
+      
+      if (recipientList.length === 0) {
+        toast({
+          title: "Error",
+          description: "Please provide valid WhatsApp recipients",
+          variant: "destructive",
+        })
+        return
+      }
+
+      const result = await apiClient.sendWhatsAppReport({
+        recipients: recipientList,
+        format: reportFormat,
+        reportType: 'daily'
+      })
+      
+      if (result.success) {
+        toast({
+          title: "WhatsApp Report Sent",
+          description: `Test ${reportFormat} report sent successfully to ${result.data?.successCount || 0}/${recipientList.length} recipients.`,
+        })
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to send WhatsApp report",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to send WhatsApp test report",
         variant: "destructive",
       })
     }
@@ -447,6 +522,83 @@ const Settings = () => {
                         </FormItem>
                       )}
                     />
+
+                    {/* Alert Resending Configuration */}
+                    <Card className="border-dashboard-border">
+                      <CardHeader>
+                        <CardTitle className="text-base">Alert Resending</CardTitle>
+                        <CardDescription>
+                          Configure automatic resending of unacknowledged alerts.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="alerts.resending.enabled"
+                          render={({ field }) => (
+                            <FormItem className="flex items-center justify-between">
+                              <div>
+                                <FormLabel>Enable Alert Resending</FormLabel>
+                                <FormDescription>
+                                  Automatically resend alerts if not acknowledged within the specified interval.
+                                </FormDescription>
+                              </div>
+                              <FormControl>
+                                <Switch disabled={disabledAlerts} checked={field.value} onCheckedChange={field.onChange} />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="alerts.resending.resendInterval"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Resend Interval (minutes)</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    min={1} 
+                                    max={1440} 
+                                    disabled={disabledAlerts || !form.watch("alerts.resending.enabled")} 
+                                    {...field} 
+                                  />
+                                </FormControl>
+                                <FormDescription>
+                                  How often to resend unacknowledged alerts (1-1440 minutes).
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          
+                          <FormField
+                            control={form.control}
+                            name="alerts.resending.maxResends"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Maximum Resends</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" 
+                                    min={1} 
+                                    max={10} 
+                                    disabled={disabledAlerts || !form.watch("alerts.resending.enabled")} 
+                                    {...field} 
+                                  />
+                                </FormControl>
+                                <FormDescription>
+                                  Maximum number of resend attempts (1-10).
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </CardContent>
+                    </Card>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <Card className="border-dashboard-border">
@@ -844,7 +996,7 @@ const Settings = () => {
                       name="reporting.recipients"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Report Recipients</FormLabel>
+                          <FormLabel>Email Recipients</FormLabel>
                           <FormControl>
                             <Textarea rows={3} placeholder="comma,separated@example.com" {...field} />
                           </FormControl>
@@ -853,20 +1005,98 @@ const Settings = () => {
                         </FormItem>
                       )}
                     />
+
+                    {/* WhatsApp Reporting Section */}
+                    <div className="space-y-4 border-t pt-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="text-sm font-medium">WhatsApp Reporting</h4>
+                          <p className="text-sm text-muted-foreground">Send daily monitoring reports via WhatsApp</p>
+                        </div>
+                        <FormField
+                          control={form.control}
+                          name="reporting.whatsappEnabled"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormControl>
+                                <Switch checked={field.value} onCheckedChange={field.onChange} />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      {form.watch("reporting.whatsappEnabled") && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="reporting.whatsappRecipients"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>WhatsApp Recipients</FormLabel>
+                                <FormControl>
+                                  <Textarea 
+                                    rows={3} 
+                                    placeholder="+6281234567890, +6287654321098" 
+                                    {...field} 
+                                  />
+                                </FormControl>
+                                <FormDescription>Comma-separated phone numbers with country code.</FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="reporting.whatsappFormat"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>WhatsApp Report Format</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select format" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="summary">Summary (Brief)</SelectItem>
+                                    <SelectItem value="detailed">Detailed (Full Stats)</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormDescription>Choose report detail level for WhatsApp.</FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </CardContent>
                   <CardFooter className="flex justify-between">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() =>
-                        toast({
-                          title: "Test report generated",
-                          description: "A preview report has been generated (mock).",
-                        })
-                      }
-                    >
-                      Send test report
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() =>
+                          toast({
+                            title: "Test email report sent",
+                            description: "A preview email report has been generated (mock).",
+                          })
+                        }
+                      >
+                        Test Email Report
+                      </Button>
+                      {form.watch("reporting.whatsappEnabled") && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleTestWhatsAppReport}
+                          disabled={!form.watch("whatsapp.enabled")}
+                        >
+                          Test WhatsApp Report
+                        </Button>
+                      )}
+                    </div>
                     <Button type="submit">Save changes</Button>
                   </CardFooter>
                 </Card>
