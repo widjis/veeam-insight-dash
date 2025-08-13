@@ -244,7 +244,7 @@ router.get('/alerts', dashboardLimiter, async (req: Request, res: Response) => {
       timestamp: new Date().toISOString(),
     };
 
-    res.json(response);
+    return res.json(response);
   } catch (error) {
     logger.error('Failed to get dashboard alerts:', error);
     const response: ApiResponse<null> = {

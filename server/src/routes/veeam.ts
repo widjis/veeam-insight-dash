@@ -154,7 +154,7 @@ router.get('/jobs/:id', veeamLimiter, async (req: Request, res: Response) => {
       timestamp: new Date().toISOString(),
     };
 
-    res.json(response);
+    return res.json(response);
   } catch (error) {
     logger.error('Failed to fetch job details:', error);
     const response: ApiResponse<null> = {
@@ -162,7 +162,7 @@ router.get('/jobs/:id', veeamLimiter, async (req: Request, res: Response) => {
       error: 'Failed to fetch job details',
       timestamp: new Date().toISOString(),
     };
-    res.status(500).json(response);
+    return res.status(500).json(response);
   }
 });
 

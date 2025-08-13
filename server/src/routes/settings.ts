@@ -268,7 +268,7 @@ router.put('/',
         timestamp: new Date().toISOString(),
       };
 
-      res.json(response);
+      return res.json(response);
     } catch (error) {
       logger.error('Error updating settings:', error);
       const response: ApiResponse<null> = {
@@ -276,7 +276,7 @@ router.put('/',
         error: 'Failed to update settings',
         timestamp: new Date().toISOString(),
       };
-      res.status(500).json(response);
+      return res.status(500).json(response);
     }
   }
 );
@@ -335,7 +335,7 @@ router.post('/whatsapp/send-personal',
         timestamp: new Date().toISOString(),
       };
 
-      res.json(apiResponse);
+      return res.json(apiResponse);
     } catch (error: any) {
       logger.error('Error sending WhatsApp personal message:', error);
       const response: ApiResponse<null> = {
@@ -343,7 +343,7 @@ router.post('/whatsapp/send-personal',
         error: error.response?.data?.message || 'Failed to send WhatsApp message',
         timestamp: new Date().toISOString(),
       };
-      res.status(500).json(response);
+      return res.status(500).json(response);
     }
   }
 );
@@ -413,7 +413,7 @@ router.post('/whatsapp/send-group',
         timestamp: new Date().toISOString(),
       };
 
-      res.json(apiResponse);
+      return res.json(apiResponse);
     } catch (error: any) {
       logger.error('Error sending WhatsApp group message:', error);
       const response: ApiResponse<null> = {
@@ -421,7 +421,7 @@ router.post('/whatsapp/send-group',
         error: error.response?.data?.message || 'Failed to send WhatsApp group message',
         timestamp: new Date().toISOString(),
       };
-      res.status(500).json(response);
+      return res.status(500).json(response);
     }
   }
 );
@@ -465,7 +465,7 @@ router.post('/whatsapp/test',
         timestamp: new Date().toISOString(),
       };
 
-      res.json(apiResponse);
+      return res.json(apiResponse);
     } catch (error: any) {
       logger.error('Error testing WhatsApp connection:', error);
       const response: ApiResponse<null> = {
@@ -473,7 +473,7 @@ router.post('/whatsapp/test',
         error: error.response?.data?.message || 'Failed to test WhatsApp connection',
         timestamp: new Date().toISOString(),
       };
-      res.status(500).json(response);
+      return res.status(500).json(response);
     }
   }
 );
@@ -557,7 +557,7 @@ router.put('/whatsapp',
         data: { message: 'WhatsApp settings updated successfully' },
         timestamp: new Date().toISOString(),
       };
-      res.json(response);
+      return res.json(response);
     } catch (error: any) {
       logger.error('Error updating WhatsApp settings:', error);
       const response: ApiResponse<null> = {
@@ -565,7 +565,7 @@ router.put('/whatsapp',
         error: 'Failed to update WhatsApp settings',
         timestamp: new Date().toISOString(),
       };
-      res.status(500).json(response);
+      return res.status(500).json(response);
     }
   }
 );
@@ -608,7 +608,7 @@ router.post('/whatsapp/test-personal',
         data: { message: 'Personal WhatsApp test message sent successfully' },
         timestamp: new Date().toISOString(),
       };
-      res.json(apiResponse);
+      return res.json(apiResponse);
     } catch (error: any) {
       logger.error('Error sending WhatsApp personal test:', error);
       const response: ApiResponse<null> = {
@@ -616,7 +616,7 @@ router.post('/whatsapp/test-personal',
         error: error.response?.data?.message || 'Failed to send personal test message',
         timestamp: new Date().toISOString(),
       };
-      res.status(500).json(response);
+      return res.status(500).json(response);
     }
   }
 );
@@ -659,7 +659,7 @@ router.post('/whatsapp/test-group',
         data: { message: 'Group WhatsApp test message sent successfully' },
         timestamp: new Date().toISOString(),
       };
-      res.json(apiResponse);
+      return res.json(apiResponse);
     } catch (error: any) {
       logger.error('Error sending WhatsApp group test:', error);
       const response: ApiResponse<null> = {
@@ -667,7 +667,7 @@ router.post('/whatsapp/test-group',
         error: error.response?.data?.message || 'Failed to send group test message',
         timestamp: new Date().toISOString(),
       };
-      res.status(500).json(response);
+      return res.status(500).json(response);
     }
   }
 );
@@ -785,7 +785,7 @@ router.post('/whatsapp/send-report',
         timestamp: new Date().toISOString(),
       };
       
-      res.json(apiResponse);
+      return res.json(apiResponse);
     } catch (error: any) {
       logger.error('Error sending WhatsApp report:', error);
       const response: ApiResponse<null> = {
@@ -793,7 +793,7 @@ router.post('/whatsapp/send-report',
         error: 'Failed to send WhatsApp report',
         timestamp: new Date().toISOString(),
       };
-      res.status(500).json(response);
+      return res.status(500).json(response);
     }
   }
 );
