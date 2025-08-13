@@ -252,7 +252,7 @@ router.get('/alerts', dashboardLimiter, async (req: Request, res: Response) => {
       error: 'Failed to retrieve alerts',
       timestamp: new Date().toISOString(),
     };
-    res.status(500).json(response);
+    return res.status(500).json(response);
   }
 });
 
@@ -427,7 +427,7 @@ router.post('/test-alerts', dashboardLimiter, async (req: Request, res: Response
       timestamp: new Date().toISOString(),
     };
     
-    res.json(response);
+    return res.json(response);
   } catch (error) {
     logger.error('Failed to generate test alerts:', error);
     const response: ApiResponse<null> = {
@@ -435,7 +435,7 @@ router.post('/test-alerts', dashboardLimiter, async (req: Request, res: Response
       error: 'Failed to generate test alerts',
       timestamp: new Date().toISOString(),
     };
-    res.status(500).json(response);
+    return res.status(500).json(response);
   }
 });
 
