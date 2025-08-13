@@ -24,15 +24,19 @@ WORKDIR /app/backend
 
 # Copy backend package files
 COPY server/package*.json ./
+COPY server/tsconfig.json ./
 
-# Install backend dependencies
-RUN npm ci --only=production
+# Install all dependencies (including devDependencies for build)
+RUN npm ci
 
 # Copy backend source code
-COPY server/ .
+COPY server/src ./src
 
-# Build backend (if TypeScript)
+# Build backend TypeScript
 RUN npm run build
+
+# Install production dependencies only
+RUN npm ci --only=production && npm cache clean --force
 
 # Stage 3: Production Runtime
 FROM node:18-alpine AS production
