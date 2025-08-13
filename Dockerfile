@@ -59,8 +59,8 @@ COPY --from=backend-build --chown=veeam:nodejs /app/backend/dist ./dist
 COPY --from=backend-build --chown=veeam:nodejs /app/backend/node_modules ./node_modules
 COPY --from=backend-build --chown=veeam:nodejs /app/backend/package*.json ./
 
-# Create logs directory
-RUN mkdir -p /app/logs && chown -R veeam:nodejs /app/logs
+# Create logs and tokens directories
+RUN mkdir -p /app/logs /app/tokens && chown -R veeam:nodejs /app/logs /app/tokens
 
 # Switch to non-root user
 USER veeam

@@ -38,7 +38,7 @@ export class VeeamService {
       }),
     });
 
-    this.tokenFilePath = path.join(process.cwd(), 'tokens.json');
+    this.tokenFilePath = path.join(process.cwd(), 'tokens', 'tokens.json');
     this.loadTokens();
 
     // Add request interceptor to handle authentication

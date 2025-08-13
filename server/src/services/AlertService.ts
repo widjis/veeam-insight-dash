@@ -671,7 +671,7 @@ export class AlertService {
     if (rule.actions.resendInterval && rule.actions.maxResends) {
       setTimeout(async () => {
         await this.checkAndResendAlert(alert.id, rule);
-      }, rule.actions.resendInterval * 60 * 1000); // Convert minutes to milliseconds
+      }, rule.actions.resendInterval); // resendInterval is already in milliseconds
     }
   }
 
@@ -730,7 +730,7 @@ export class AlertService {
                const lastSentTime = lastResendAt ? new Date(lastResendAt) : new Date(alert.timestamp);
                const timeSinceLastSend = Date.now() - lastSentTime.getTime();
                
-               if (timeSinceLastSend >= rule.actions.resendInterval * 60 * 1000) {
+               if (timeSinceLastSend >= rule.actions.resendInterval) {
                  await this.checkAndResendAlert(alert.id, rule);
                }
              }
