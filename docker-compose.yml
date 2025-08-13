@@ -71,8 +71,8 @@ services:
       - "${HTTP_PORT:-9007}:80"
       - "${HTTPS_PORT:-9008}:443"
     volumes:
-      # Use HTTP-only config when SSL is disabled, full config when enabled
-      - ${ENABLE_SSL:-false} == 'true' ? ./nginx.conf:/etc/nginx/nginx.conf:ro : ./nginx-http.conf:/etc/nginx/nginx.conf:ro
+      # Use HTTP-only config by default (change to nginx.conf for HTTPS)
+      - ./nginx-http.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
     environment:
       - ENABLE_SSL=${ENABLE_SSL:-false}
