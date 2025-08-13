@@ -1430,6 +1430,12 @@ ports:
 - ✅ Updated SSL connection test: `openssl s_client -connect localhost:9008`
 - ✅ Updated port availability checks: `netstat -tlnp | grep :9007` and `netstat -tlnp | grep :9008`
 
+#### 3. **<mcfile name=".env.production" path="/Users/widjis/Documents/System Project/veeam-insight-dash/.env.production"></mcfile>**
+- ✅ Updated CORS_ORIGIN from `http://localhost:8080` to `http://localhost:9007`
+
+#### 4. **<mcfile name="server/.env" path="/Users/widjis/Documents/System Project/veeam-insight-dash/server/.env"></mcfile>**
+- ✅ Updated CORS_ORIGIN from `http://localhost:8080` to `http://localhost:9007`
+
 ### Access URLs
 - **HTTP**: `http://your-server:9007`
 - **HTTPS**: `https://your-server:9008`
