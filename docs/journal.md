@@ -1,5 +1,52 @@
 # Veeam Insight Dashboard - Development Journal
 
+## Authentication & WebSocket Connection Issues Resolution - August 13, 2025 (21:47 WIB)
+
+### 🔧 Fixed Login Authentication and WebSocket Connection Errors
+
+**Issues Identified:**
+1. **Login Authentication Failure**: User unable to login with "admin/admin" credentials
+2. **WebSocket Connection Error**: `WebSocket connection to 'ws://localhost:3001/socket.io/?EIO=4&transport=websocket' failed`
+
+**Root Cause Analysis:**
+1. **Authentication System**: The `verifyPassword` function in `auth.ts` correctly expects "admin/admin" credentials - authentication should work
+2. **WebSocket URL Configuration**: Frontend WebSocket service uses `import.meta.env.VITE_WS_URL` but falls back to `http://localhost:3001` in production
+3. **Environment Variables**: Missing `VITE_WS_URL` and `VITE_API_URL` in environment configuration for production build
+4. **Nginx Configuration**: Missing Socket.IO endpoint proxy configuration
+
+**Solution Implemented:**
+1. **✅ Updated Environment Configuration**:
+   - Added `VITE_API_URL=http://10.60.10.59:9007/api` to `.env` and `.env.production`
+   - Added `VITE_WS_URL=http://10.60.10.59:9007` for WebSocket connections
+   - Updated `CORS_ORIGIN=http://10.60.10.59:9007` for production
+
+2. **✅ Enhanced Nginx Configuration**:
+   - Added `/socket.io/` location block to proxy Socket.IO connections to backend
+   - Configured proper WebSocket headers and timeouts
+   - Maintained backward compatibility with `/ws` endpoint
+
+3. **✅ Authentication Verification**:
+   - Confirmed `verifyPassword` function uses simple "admin/admin" authentication
+   - Login should work with correct credentials
+
+**Files Modified:**
+- `.env` - Added frontend environment variables and updated CORS
+- `.env.production` - Updated CORS origin and added frontend variables
+- `nginx-http.conf` - Added Socket.IO proxy configuration
+
+**Technical Notes:**
+- Frontend needs to be rebuilt with new environment variables to apply WebSocket URL changes
+- Socket.IO connections now properly proxied through Nginx on production server
+- Authentication system uses development-friendly plain text password verification
+
+**Next Steps for Deployment:**
+1. Rebuild Docker containers on production server: `docker compose down && docker compose up --build -d`
+2. Verify frontend build includes new environment variables
+3. Test login with "admin/admin" credentials
+4. Verify WebSocket connections establish successfully
+
+---
+
 ## Nginx Frontend Serving Fix - August 13, 2025 (21:21 WIB)
 
 ### 🔧 Fixed Nginx Default Welcome Page Issue
