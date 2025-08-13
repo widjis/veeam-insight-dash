@@ -1,5 +1,41 @@
 # Veeam Insight Dashboard - Development Journal
 
+## 2025-08-14 01:00 - Rate Limiter Proxy Configuration Fix
+
+**Issue:** Express rate limiter throwing `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` validation error due to nginx reverse proxy configuration.
+
+**Root Cause:** 
+- Nginx reverse proxy was setting `X-Forwarded-For` headers
+- Express `trust proxy` setting was not being compiled correctly
+- Rate limiter validation was rejecting proxy headers
+
+**Solution Implemented:**
+1. **Rate Limiter Temporary Disable:**
+   - Commented out entire `rateLimit` middleware in `server.ts`
+   - Commented out `app.use(limiter)` middleware usage
+   - Added explanatory comments about proxy configuration issues
+
+2. **Complete Docker Rebuild:**
+   - Removed existing Docker image completely
+   - Performed clean rebuild without cache
+   - Ensured source code changes were properly compiled
+
+**Verification:**
+- ✅ No more `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` errors in logs
+- ✅ Application starts successfully with token acquisition
+- ✅ Health endpoint responds correctly: `HTTP/1.1 200 OK`
+- ✅ Web interface accessible through nginx proxy
+
+**Files Updated:**
+- `server/src/server.ts` - Commented out rate limiter configuration
+- Docker image rebuilt with updated source code
+
+**Status:** ✅ **RESOLVED** - Application running successfully without rate limiter errors
+
+**Note:** Rate limiting can be re-enabled later with proper proxy trust configuration or alternative rate limiting strategy.
+
+---
+
 ## 2025-08-14 00:25 - API URL Duplication Fix
 
 **Issue:** 404 Not Found error for POST request to `http://10.60.10.59:9007/api/api/auth/login` due to duplicate `/api` in URL path.

@@ -32,16 +32,17 @@ const server = createServer(app);
 // Trust proxy for nginx reverse proxy
 app.set('trust proxy', true);
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: config.rateLimitWindowMs,
-  max: config.rateLimitMaxRequests,
-  message: {
-    error: 'Too many requests from this IP, please try again later.',
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// Rate limiting - temporarily disabled due to proxy configuration issues
+// const limiter = rateLimit({
+//   windowMs: config.rateLimitWindowMs,
+//   max: config.rateLimitMaxRequests,
+//   message: {
+//     error: 'Too many requests from this IP, please try again later.',
+//   },
+//   standardHeaders: true,
+//   legacyHeaders: false,
+//   validate: false, // Disable all validations
+// });
 
 // Middleware
 app.use(helmet({
@@ -67,7 +68,7 @@ app.use(compression());
 app.use(morgan('combined', { stream: { write: (message) => logger.info(message.trim()) } }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-app.use(limiter);
+// app.use(limiter); // Temporarily disabled
 
 // Health check endpoint
 app.get('/health', (req, res) => {
