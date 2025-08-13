@@ -1,5 +1,50 @@
 # Veeam Insight Dashboard - Development Journal
 
+## Nginx Frontend Serving Fix - August 13, 2025 (20:56 WIB)
+
+### 🌐 Fixed Nginx Default Welcome Page Issue
+
+**Issue Identified:**
+- Accessing deployed application shows nginx welcome page instead of Veeam Insight Dashboard
+- Frontend build files not accessible to nginx container
+- Nginx configured to serve from `/usr/share/nginx/html` but frontend files located in main container
+
+**Root Cause Analysis:**
+- Docker containers running in isolation - nginx container has no access to frontend build files
+- Frontend assets built and stored in main application container at `/app/public`
+- Nginx container looking for static files in default location `/usr/share/nginx/html`
+- Missing volume sharing between containers
+
+**Solution Implemented:**
+
+1. **Added shared volume** in `docker-compose.yml`:
+   ```yaml
+   volumes:
+     frontend-dist:
+       driver: local
+   ```
+
+2. **Updated main container** to share frontend files:
+   ```yaml
+   volumes:
+     - frontend-dist:/app/public
+   ```
+
+3. **Updated nginx container** to access shared files:
+   ```yaml
+   volumes:
+     - frontend-dist:/usr/share/nginx/html:ro
+   ```
+
+**Files Modified:**
+- `docker-compose.yml`: Added volume configuration for frontend asset sharing
+
+**Next Steps:**
+- Rebuild and restart containers to apply changes
+- Verify frontend application loads correctly
+
+---
+
 ## Module Resolution Fix - August 13, 2025 (20:30 WIB)
 
 ### 🔧 Fixed TypeScript Path Alias Resolution Error

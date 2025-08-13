@@ -52,6 +52,8 @@ services:
     volumes:
       - ./logs:/app/logs
       - ./server/tokens.json:/app/tokens.json
+      # Share frontend build files with nginx
+      - frontend-dist:/app/public
     networks:
       - veeam-network
     healthcheck:
@@ -74,6 +76,8 @@ services:
       # Use HTTP-only config by default (change to nginx.conf for HTTPS)
       - ./nginx-http.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
+      # Mount frontend build files from the main container
+      - frontend-dist:/usr/share/nginx/html:ro
     environment:
       - ENABLE_SSL=${ENABLE_SSL:-false}
     networks:
@@ -85,6 +89,10 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+volumes:
+  frontend-dist:
+    driver: local
 
 networks:
   veeam-network:
