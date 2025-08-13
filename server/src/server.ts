@@ -29,6 +29,9 @@ dotenv.config();
 const app = express();
 const server = createServer(app);
 
+// Trust proxy for nginx reverse proxy
+app.set('trust proxy', true);
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: config.rateLimitWindowMs,
@@ -68,6 +71,16 @@ app.use(limiter);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: config.nodeEnv,
+  });
+});
+
+// API Health endpoint for nginx proxy
+app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
