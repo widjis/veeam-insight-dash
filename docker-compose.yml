@@ -8,19 +8,20 @@ services:
     container_name: veeam-insight-dashboard
     restart: unless-stopped
     ports:
-      - "${PORT:-3001}:${PORT:-3001}"
+      - "${PORT:-3003}:${PORT:-3003}"
       - "${WS_PORT:-3002}:${WS_PORT:-3002}"
     environment:
       # Application Configuration
       - NODE_ENV=production
-      - PORT=${PORT:-3001}
+      - PORT=${PORT:-3003}
       - WS_PORT=${WS_PORT:-3002}
       
       # Veeam Configuration
-      - VEEAM_SERVER=${VEEAM_SERVER}
+      - VEEAM_BASE_URL=${VEEAM_BASE_URL}
       - VEEAM_USERNAME=${VEEAM_USERNAME}
       - VEEAM_PASSWORD=${VEEAM_PASSWORD}
-      - VEEAM_PORT=${VEEAM_PORT:-9419}
+      - VEEAM_API_VERSION=${VEEAM_API_VERSION:-v1}
+      - VEEAM_VERIFY_SSL=${VEEAM_VERIFY_SSL:-false}
       
       # Security
       - JWT_SECRET=${JWT_SECRET}
@@ -31,11 +32,7 @@ services:
       # Cache Configuration
       - CACHE_TTL=${CACHE_TTL:-300}
       
-      # Rate Limiting
-      - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-900000}
-      - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-100}
-      - LOGIN_RATE_LIMIT_WINDOW=${LOGIN_RATE_LIMIT_WINDOW:-900000}
-      - LOGIN_RATE_LIMIT_MAX=${LOGIN_RATE_LIMIT_MAX:-5}
+
       
       # Monitoring
       - HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-30000}
@@ -44,6 +41,9 @@ services:
       # WhatsApp Integration (Optional)
       - WHATSAPP_API_URL=${WHATSAPP_API_URL}
       - WHATSAPP_API_TOKEN=${WHATSAPP_API_TOKEN}
+      - WHATSAPP_CHAT_ID=${WHATSAPP_CHAT_ID}
+      - WHATSAPP_ENABLED=${WHATSAPP_ENABLED}
+      - WHATSAPP_DEFAULT_RECIPIENTS=${WHATSAPP_DEFAULT_RECIPIENTS}
       - WHATSAPP_PHONE_NUMBER=${WHATSAPP_PHONE_NUMBER}
       
       # Logging
@@ -51,13 +51,13 @@ services:
       - LOG_FILE=${LOG_FILE:-/app/logs/app.log}
     volumes:
       - ./logs:/app/logs
-      - ./server/tokens.json:/app/tokens.json
+      - ./server/tokens:/app/tokens
       # Share frontend build files with nginx
       - frontend-dist:/app/public
     networks:
       - veeam-network
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:${PORT:-3003}/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3003/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
       interval: 30s
       timeout: 10s
       retries: 3

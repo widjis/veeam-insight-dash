@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-import rateLimit from 'express-rate-limit';
 import { VeeamService } from '@/services/VeeamService.js';
 import { CacheService } from '@/services/CacheService.js';
 import { AlertService } from '@/services/AlertService.js';
@@ -17,18 +16,7 @@ import {
 
 const router = Router();
 
-// Rate limiting for dashboard endpoints
-const dashboardLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 60, // Limit each IP to 60 requests per minute
-  message: {
-    success: false,
-    error: 'Too many dashboard requests, please try again later.',
-    timestamp: new Date().toISOString(),
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+
 
 // Initialize services
 const veeamService = new VeeamService();
@@ -111,7 +99,7 @@ async function calculateDashboardStats(): Promise<DashboardStats> {
 }
 
 // GET /api/dashboard/stats - Get dashboard statistics
-router.get('/stats', dashboardLimiter, async (req: Request, res: Response) => {
+router.get('/stats', async (req: Request, res: Response) => {
   try {
     const stats = await cacheService.get<DashboardStats>('dashboard:stats');
     
@@ -147,7 +135,7 @@ router.get('/stats', dashboardLimiter, async (req: Request, res: Response) => {
 });
 
 // GET /api/dashboard/overview - Get dashboard overview
-router.get('/overview', dashboardLimiter, async (req: Request, res: Response) => {
+router.get('/overview', async (req: Request, res: Response) => {
   try {
     const cached = cacheService.get('dashboard:overview');
     
@@ -201,7 +189,7 @@ router.get('/overview', dashboardLimiter, async (req: Request, res: Response) =>
 });
 
 // GET /api/dashboard/alerts - Get active alerts
-router.get('/alerts', dashboardLimiter, async (req: Request, res: Response) => {
+router.get('/alerts', async (req: Request, res: Response) => {
   try {
     const { severity, limit = '20', offset = '0' } = req.query;
     
@@ -257,7 +245,7 @@ router.get('/alerts', dashboardLimiter, async (req: Request, res: Response) => {
 });
 
 // GET /api/dashboard/health - Get system// Activity endpoint
-router.get('/activity', dashboardLimiter, async (req: Request, res: Response) => {
+router.get('/activity', async (req: Request, res: Response) => {
   try {
     const cacheKey = 'dashboard:activity';
     
@@ -321,7 +309,7 @@ router.get('/activity', dashboardLimiter, async (req: Request, res: Response) =>
 });
 
 // Health check endpoint
-router.get('/health', dashboardLimiter, async (req: Request, res: Response) => {
+router.get('/health', async (req: Request, res: Response) => {
   try {
     const cachedHealth = await cacheService.get<HealthCheck>('dashboard:health');
     
@@ -371,7 +359,7 @@ router.get('/health', dashboardLimiter, async (req: Request, res: Response) => {
 });
 
 // POST /api/dashboard/refresh - Force refresh dashboard data
-router.post('/refresh', dashboardLimiter, async (req: Request, res: Response) => {
+router.post('/refresh', async (req: Request, res: Response) => {
   try {
     // Clear dashboard-related cache
     const dashboardKeys = Object.keys(cacheService['cache']).filter((key: string) => 
@@ -408,7 +396,7 @@ router.post('/refresh', dashboardLimiter, async (req: Request, res: Response) =>
 });
 
 // POST /api/dashboard/test-alerts - Generate test alerts for demonstration
-router.post('/test-alerts', dashboardLimiter, async (req: Request, res: Response) => {
+router.post('/test-alerts', async (req: Request, res: Response) => {
   try {
     if (!monitoringService) {
       const response: ApiResponse<null> = {
@@ -426,7 +414,6 @@ router.post('/test-alerts', dashboardLimiter, async (req: Request, res: Response
       data: { message: 'Test alerts generated successfully' },
       timestamp: new Date().toISOString(),
     };
-    
     return res.json(response);
   } catch (error) {
     logger.error('Failed to generate test alerts:', error);

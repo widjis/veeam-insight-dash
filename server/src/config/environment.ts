@@ -1,7 +1,13 @@
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-// Load environment variables
-dotenv.config();
+// Get current directory in ES module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables from server/.env file
+dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env') });
 
 interface Config {
   port: number;
@@ -19,8 +25,7 @@ interface Config {
   refreshTokenExpiresIn: string;
   cacheTTL: number;
   cacheCheckPeriod: number;
-  rateLimitWindowMs: number;
-  rateLimitMaxRequests: number;
+
   logLevel: string;
   logFile: string;
   wsPort: number;
@@ -59,8 +64,7 @@ export const config: Config = {
   cacheCheckPeriod: parseInt(process.env.CACHE_CHECK_PERIOD || '600', 10),
   
   // Rate Limiting
-  rateLimitWindowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000', 10),
-  rateLimitMaxRequests: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100', 10),
+
   
   // Logging
   logLevel: process.env.LOG_LEVEL || 'info',

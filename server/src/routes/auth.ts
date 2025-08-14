@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import rateLimit from 'express-rate-limit';
+
 import { config } from '@/config/environment.js';
 import { logger } from '@/utils/logger.js';
 import { authMiddleware } from '@/middleware/auth.js';
@@ -15,18 +15,18 @@ import {
 
 const router = Router();
 
-// Rate limiting for auth endpoints
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Limit each IP to 5 requests per windowMs
-  message: {
-    success: false,
-    error: 'Too many authentication attempts, please try again later.',
-    timestamp: new Date().toISOString(),
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// Rate limiting for auth endpoints - temporarily disabled due to proxy configuration issues
+// const authLimiter = rateLimit({
+//   windowMs: 15 * 60 * 1000, // 15 minutes
+//   max: 5, // Limit each IP to 5 requests per windowMs
+//   message: {
+//     success: false,
+//     error: 'Too many authentication attempts, please try again later.',
+//     timestamp: new Date().toISOString(),
+//   },
+//   standardHeaders: true,
+//   legacyHeaders: false,
+// });
 
 // Mock user database (in production, this would be a real database)
 const users: User[] = [
@@ -109,7 +109,7 @@ async function verifyPassword(username: string, password: string): Promise<boole
  * @desc Authenticate user and return tokens
  * @access Public
  */
-router.post('/login', authLimiter, async (req: Request, res: Response) => {
+router.post('/login', async (req: Request, res: Response) => {
   try {
     const { username, password }: LoginRequest = req.body;
 
@@ -185,7 +185,7 @@ router.post('/login', authLimiter, async (req: Request, res: Response) => {
  * @desc Refresh access token using refresh token
  * @access Public
  */
-router.post('/refresh', authLimiter, async (req: Request, res: Response) => {
+router.post('/refresh', async (req: Request, res: Response) => {
   try {
     const { refreshToken }: RefreshTokenRequest = req.body;
 

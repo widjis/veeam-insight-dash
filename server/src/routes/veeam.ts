@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-import rateLimit from 'express-rate-limit';
 import { VeeamService } from '@/services/VeeamService.js';
 import { MockVeeamService } from '@/services/MockVeeamService.js';
 import { CacheService } from '@/services/CacheService.js';
@@ -15,18 +14,7 @@ import {
 
 const router = Router();
 
-// Rate limiting for Veeam API endpoints
-const veeamLimiter = rateLimit({
-  windowMs: 1 * 60 * 1000, // 1 minute
-  max: 30, // Limit each IP to 30 requests per minute
-  message: {
-    success: false,
-    error: 'Too many Veeam API requests, please try again later.',
-    timestamp: new Date().toISOString(),
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+
 
 // Initialize services
 // Use mock service if Veeam password is not configured
@@ -72,7 +60,7 @@ async function getCachedOrFetch<T>(
 }
 
 // GET /api/veeam/health - Check Veeam API health
-router.get('/health', veeamLimiter, async (req: Request, res: Response) => {
+router.get('/health', async (req: Request, res: Response) => {
   try {
     const health = await getCachedOrFetch(
       'veeam:health',
@@ -99,7 +87,7 @@ router.get('/health', veeamLimiter, async (req: Request, res: Response) => {
 });
 
 // GET /api/veeam/jobs - Get all backup jobs
-router.get('/jobs', veeamLimiter, async (req: Request, res: Response) => {
+router.get('/jobs', async (req: Request, res: Response) => {
   try {
     const jobsResponse = await getCachedOrFetch(
       'veeam:jobs',
@@ -125,7 +113,7 @@ router.get('/jobs', veeamLimiter, async (req: Request, res: Response) => {
 });
 
 // GET /api/veeam/jobs/:id - Get specific job details
-router.get('/jobs/:id', veeamLimiter, async (req: Request, res: Response) => {
+router.get('/jobs/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const jobsResponse = await getCachedOrFetch(
@@ -167,7 +155,7 @@ router.get('/jobs/:id', veeamLimiter, async (req: Request, res: Response) => {
 });
 
 // GET /api/veeam/jobs/:id/sessions - Get job sessions
-router.get('/jobs/:id/sessions', veeamLimiter, async (req: Request, res: Response) => {
+router.get('/jobs/:id/sessions', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { limit = '10', offset = '0' } = req.query;
@@ -184,7 +172,7 @@ router.get('/jobs/:id/sessions', veeamLimiter, async (req: Request, res: Respons
       timestamp: new Date().toISOString(),
     };
 
-    res.json(response);
+    return res.json(response);
   } catch (error) {
     logger.error(`Failed to fetch sessions for job ${req.params.id}:`, error);
     const response: ApiResponse<null> = {
@@ -192,12 +180,12 @@ router.get('/jobs/:id/sessions', veeamLimiter, async (req: Request, res: Respons
       error: 'Failed to fetch job sessions',
       timestamp: new Date().toISOString(),
     };
-    res.status(500).json(response);
+    return res.status(500).json(response);
   }
 });
 
 // GET /api/veeam/repositories - Get all backup repositories
-router.get('/repositories', veeamLimiter, async (req: Request, res: Response) => {
+router.get('/repositories', async (req: Request, res: Response) => {
   try {
     const repositoriesResponse = await getCachedOrFetch(
       'veeam:repositories',
@@ -224,7 +212,7 @@ router.get('/repositories', veeamLimiter, async (req: Request, res: Response) =>
 });
 
 // GET /api/veeam/repositories/:id - Get specific repository details
-router.get('/repositories/:id', veeamLimiter, async (req: Request, res: Response) => {
+router.get('/repositories/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const repositoriesResponse = await getCachedOrFetch(
@@ -262,7 +250,7 @@ router.get('/repositories/:id', veeamLimiter, async (req: Request, res: Response
 });
 
 // GET /api/veeam/sessions - Get all sessions
-router.get('/sessions', veeamLimiter, async (req: Request, res: Response) => {
+router.get('/sessions', async (req: Request, res: Response) => {
   try {
     const { limit = '50', offset = '0' } = req.query;
 
@@ -291,7 +279,7 @@ router.get('/sessions', veeamLimiter, async (req: Request, res: Response) => {
 });
 
 // GET /api/veeam/infrastructure - Get infrastructure servers
-router.get('/infrastructure', veeamLimiter, async (req: Request, res: Response) => {
+router.get('/infrastructure', async (req: Request, res: Response) => {
   try {
     const infrastructureResponse = await getCachedOrFetch(
       'veeam:infrastructure',

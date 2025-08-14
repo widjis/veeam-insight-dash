@@ -67,6 +67,10 @@ COPY --from=backend-build --chown=veeam:nodejs /app/backend/dist ./dist
 COPY --from=backend-build --chown=veeam:nodejs /app/backend/node_modules ./node_modules
 COPY --from=backend-build --chown=veeam:nodejs /app/backend/package*.json ./
 
+# Copy environment files
+COPY .env.production /app/.env.production
+COPY server/.env.production /app/server/.env.production
+
 # Copy entrypoint script
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
@@ -78,11 +82,11 @@ RUN mkdir -p /app/logs /app/tokens /app/public && chown -R veeam:nodejs /app/log
 USER veeam
 
 # Expose ports
-EXPOSE 3001 3002
+EXPOSE 3003 3002
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3001/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
+  CMD node -e "require('http').get('http://localhost:3003/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
 # Set entrypoint
 ENTRYPOINT ["/entrypoint.sh"]

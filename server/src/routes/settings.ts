@@ -1,5 +1,4 @@
 import { Router, Request, Response } from 'express';
-import rateLimit from 'express-rate-limit';
 import fs from 'fs/promises';
 import path from 'path';
 import { body, validationResult } from 'express-validator';
@@ -11,18 +10,18 @@ import axios from 'axios';
 
 const router = Router();
 
-// Rate limiting for settings endpoints
-const settingsLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 10, // Limit each IP to 10 requests per 5 minutes
-  message: {
-    success: false,
-    error: 'Too many settings requests, please try again later.',
-    timestamp: new Date().toISOString(),
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+// Rate limiting for settings endpoints - temporarily disabled due to proxy configuration issues
+// const settingsLimiter = rateLimit({
+//   windowMs: 5 * 60 * 1000, // 5 minutes
+//   max: 10, // Limit each IP to 10 requests per 5 minutes
+//   message: {
+//     success: false,
+//     error: 'Too many settings requests, please try again later.',
+//     timestamp: new Date().toISOString(),
+//   },
+//   standardHeaders: true,
+//   legacyHeaders: false,
+// });
 
 // WhatsApp API URLs
 const WHATSAPP_GROUP_URL = 'http://10.60.10.59:8192/send-group-message';
@@ -51,103 +50,115 @@ interface WhatsAppMessageRequest {
 
 // Helper function to update .env file
 async function updateEnvFile(updates: Record<string, string>): Promise<void> {
-  const envPath = path.join(process.cwd(), '.env');
+  // In Docker/production environments, we should update runtime environment variables
+  // instead of trying to write to .env files which may be read-only
   
   try {
-    // Read current .env file
-    let envContent = '';
-    try {
-      envContent = await fs.readFile(envPath, 'utf-8');
-    } catch (error) {
-      // File doesn't exist, create new content
-      logger.info('.env file not found, creating new one');
-    }
-
-    // Parse existing environment variables
-    const envLines = envContent.split('\n');
-    const envMap = new Map<string, string>();
-    const comments: string[] = [];
-
-    envLines.forEach(line => {
-      const trimmedLine = line.trim();
-      if (trimmedLine.startsWith('#') || trimmedLine === '') {
-        comments.push(line);
-      } else if (trimmedLine.includes('=')) {
-        const [key, ...valueParts] = trimmedLine.split('=');
-        envMap.set(key.trim(), valueParts.join('='));
-      }
-    });
-
-    // Update with new values
+    // Update runtime environment variables
     Object.entries(updates).forEach(([key, value]) => {
-      envMap.set(key, value);
+      process.env[key] = value;
+      logger.info(`Updated environment variable: ${key}`);
     });
 
-    // Rebuild .env content
-    const newEnvContent = [
-      '# Veeam Insight Dashboard Configuration',
-      '# Server Configuration',
-      `PORT=${envMap.get('PORT') || '3001'}`,
-      `NODE_ENV=${envMap.get('NODE_ENV') || 'development'}`,
-      `CORS_ORIGIN=${envMap.get('CORS_ORIGIN') || 'http://localhost:8080'}`,
-      '',
-      '# Veeam API Configuration',
-      `VEEAM_BASE_URL=${envMap.get('VEEAM_BASE_URL') || 'https://10.60.10.128:9419'}`,
-      `VEEAM_API_VERSION=${envMap.get('VEEAM_API_VERSION') || '1.1-rev1'}`,
-      `VEEAM_USERNAME=${envMap.get('VEEAM_USERNAME') || 'admin.it'}`,
-      `VEEAM_PASSWORD=${envMap.get('VEEAM_PASSWORD') || ''}`,
-      `VEEAM_VERIFY_SSL=${envMap.get('VEEAM_VERIFY_SSL') || 'false'}`,
-      '',
-      '# Authentication',
-      `JWT_SECRET=${envMap.get('JWT_SECRET') || 'your-super-secret-jwt-key-change-in-production'}`,
-      `JWT_EXPIRES_IN=${envMap.get('JWT_EXPIRES_IN') || '24h'}`,
-      `JWT_REFRESH_SECRET=${envMap.get('JWT_REFRESH_SECRET') || 'your-super-secret-refresh-key-change-in-production'}`,
-      `JWT_REFRESH_EXPIRES_IN=${envMap.get('JWT_REFRESH_EXPIRES_IN') || '7d'}`,
-      `REFRESH_TOKEN_EXPIRES_IN=${envMap.get('REFRESH_TOKEN_EXPIRES_IN') || '7d'}`,
-      '',
-      '# Cache Configuration',
-      `CACHE_TTL=${envMap.get('CACHE_TTL') || '300'}`,
-      `CACHE_CHECK_PERIOD=${envMap.get('CACHE_CHECK_PERIOD') || '600'}`,
-      '',
-      '# Rate Limiting',
-      `RATE_LIMIT_WINDOW_MS=${envMap.get('RATE_LIMIT_WINDOW_MS') || '900000'}`,
-      `RATE_LIMIT_MAX_REQUESTS=${envMap.get('RATE_LIMIT_MAX_REQUESTS') || '100'}`,
-      '',
-      '# Logging',
-      `LOG_LEVEL=${envMap.get('LOG_LEVEL') || 'info'}`,
-      `LOG_FILE=${envMap.get('LOG_FILE') || 'logs/app.log'}`,
-      '',
-      '# WebSocket Configuration',
-      `WS_PORT=${envMap.get('WS_PORT') || '3002'}`,
-      '',
-      '# Monitoring Configuration',
-      `MONITORING_INTERVAL=${envMap.get('MONITORING_INTERVAL') || '30000'}`,
-      `ALERT_CHECK_INTERVAL=${envMap.get('ALERT_CHECK_INTERVAL') || '60000'}`,
-      `HEALTH_CHECK_INTERVAL=${envMap.get('HEALTH_CHECK_INTERVAL') || '30'}`,
-      `METRICS_INTERVAL=${envMap.get('METRICS_INTERVAL') || '60'}`,
-      '',
-      '# WhatsApp Integration (Optional)',
-      `WHATSAPP_API_URL=${envMap.get('WHATSAPP_API_URL') || 'http://10.60.10.59:8192'}`,
-      `WHATSAPP_API_TOKEN=${envMap.get('WHATSAPP_API_TOKEN') || ''}`,
-      `WHATSAPP_CHAT_ID=${envMap.get('WHATSAPP_CHAT_ID') || '120363123402010871@g.us'}`,
-      `WHATSAPP_ENABLED=${envMap.get('WHATSAPP_ENABLED') || 'false'}`,
-      `WHATSAPP_DEFAULT_RECIPIENTS=${envMap.get('WHATSAPP_DEFAULT_RECIPIENTS') || ''}`,
-      '',
-      '# Database (Future use)',
-      '# DATABASE_URL=postgresql://user:password@localhost:5432/veeam_dashboard',
-      '',
-      '# Email Configuration (Future use)',
-      '# EMAIL_HOST=smtp.gmail.com',
-      '# EMAIL_PORT=587',
-      '# EMAIL_USER=your-email@gmail.com',
-      '# EMAIL_PASS=your-app-password'
-    ].join('\n');
+    // Only attempt to write .env file in development environment
+    if (process.env.NODE_ENV === 'development') {
+      const envPath = path.join(process.cwd(), '.env');
+      
+      try {
+        // Read current .env file
+        let envContent = '';
+        try {
+          envContent = await fs.readFile(envPath, 'utf-8');
+        } catch (error) {
+          // File doesn't exist, create new content
+          logger.info('.env file not found, creating new one');
+        }
 
-    // Write updated .env file
-    await fs.writeFile(envPath, newEnvContent, 'utf-8');
-    logger.info('Environment file updated successfully');
+        // Parse existing environment variables
+        const envLines = envContent.split('\n');
+        const envMap = new Map<string, string>();
+
+        envLines.forEach(line => {
+          const trimmedLine = line.trim();
+          if (!trimmedLine.startsWith('#') && trimmedLine !== '' && trimmedLine.includes('=')) {
+            const [key, ...valueParts] = trimmedLine.split('=');
+            envMap.set(key.trim(), valueParts.join('='));
+          }
+        });
+
+        // Update with new values
+        Object.entries(updates).forEach(([key, value]) => {
+          envMap.set(key, value);
+        });
+
+        // Rebuild .env content
+        const newEnvContent = [
+          '# Veeam Insight Dashboard Configuration',
+          '# Server Configuration',
+          `PORT=${envMap.get('PORT') || '3001'}`,
+          `NODE_ENV=${envMap.get('NODE_ENV') || 'development'}`,
+          `CORS_ORIGIN=${envMap.get('CORS_ORIGIN') || 'http://localhost:8080'}`,
+          '',
+          '# Veeam API Configuration',
+          `VEEAM_BASE_URL=${envMap.get('VEEAM_BASE_URL') || 'https://10.60.10.128:9419'}`,
+          `VEEAM_API_VERSION=${envMap.get('VEEAM_API_VERSION') || '1.1-rev1'}`,
+          `VEEAM_USERNAME=${envMap.get('VEEAM_USERNAME') || 'admin.it'}`,
+          `VEEAM_PASSWORD=${envMap.get('VEEAM_PASSWORD') || ''}`,
+          `VEEAM_VERIFY_SSL=${envMap.get('VEEAM_VERIFY_SSL') || 'false'}`,
+          '',
+          '# Authentication',
+          `JWT_SECRET=${envMap.get('JWT_SECRET') || 'your-super-secret-jwt-key-change-in-production'}`,
+          `JWT_EXPIRES_IN=${envMap.get('JWT_EXPIRES_IN') || '24h'}`,
+          `JWT_REFRESH_SECRET=${envMap.get('JWT_REFRESH_SECRET') || 'your-super-secret-refresh-key-change-in-production'}`,
+          `JWT_REFRESH_EXPIRES_IN=${envMap.get('JWT_REFRESH_EXPIRES_IN') || '7d'}`,
+          `REFRESH_TOKEN_EXPIRES_IN=${envMap.get('REFRESH_TOKEN_EXPIRES_IN') || '7d'}`,
+          '',
+          '# Cache Configuration',
+          `CACHE_TTL=${envMap.get('CACHE_TTL') || '300'}`,
+          `CACHE_CHECK_PERIOD=${envMap.get('CACHE_CHECK_PERIOD') || '600'}`,
+          '',
+          '# Logging',
+          `LOG_LEVEL=${envMap.get('LOG_LEVEL') || 'info'}`,
+          `LOG_FILE=${envMap.get('LOG_FILE') || 'logs/app.log'}`,
+          '',
+          '# WebSocket Configuration',
+          `WS_PORT=${envMap.get('WS_PORT') || '3002'}`,
+          '',
+          '# Monitoring Configuration',
+          `MONITORING_INTERVAL=${envMap.get('MONITORING_INTERVAL') || '30000'}`,
+          `ALERT_CHECK_INTERVAL=${envMap.get('ALERT_CHECK_INTERVAL') || '60000'}`,
+          `HEALTH_CHECK_INTERVAL=${envMap.get('HEALTH_CHECK_INTERVAL') || '30'}`,
+          `METRICS_INTERVAL=${envMap.get('METRICS_INTERVAL') || '60'}`,
+          '',
+          '# WhatsApp Integration (Optional)',
+          `WHATSAPP_API_URL=${envMap.get('WHATSAPP_API_URL') || 'http://10.60.10.59:8192'}`,
+          `WHATSAPP_API_TOKEN=${envMap.get('WHATSAPP_API_TOKEN') || ''}`,
+          `WHATSAPP_CHAT_ID=${envMap.get('WHATSAPP_CHAT_ID') || '120363123402010871@g.us'}`,
+          `WHATSAPP_ENABLED=${envMap.get('WHATSAPP_ENABLED') || 'false'}`,
+          `WHATSAPP_DEFAULT_RECIPIENTS=${envMap.get('WHATSAPP_DEFAULT_RECIPIENTS') || ''}`,
+          '',
+          '# Database (Future use)',
+          '# DATABASE_URL=postgresql://user:password@localhost:5432/veeam_dashboard',
+          '',
+          '# Email Configuration (Future use)',
+          '# EMAIL_HOST=smtp.gmail.com',
+          '# EMAIL_PORT=587',
+          '# EMAIL_USER=your-email@gmail.com',
+          '# EMAIL_PASS=your-app-password'
+        ].join('\n');
+
+        // Write updated .env file
+        await fs.writeFile(envPath, newEnvContent, 'utf-8');
+        logger.info('Development .env file updated successfully');
+      } catch (fileError) {
+        logger.warn('Could not update .env file in development, but runtime variables updated:', fileError);
+      }
+    } else {
+      logger.info('Production environment detected - runtime variables updated, .env file write skipped');
+    }
+    
   } catch (error) {
-    logger.error('Error updating .env file:', error);
+    logger.error('Error updating environment configuration:', error);
     throw new Error('Failed to update environment configuration');
   }
 }
@@ -168,7 +179,7 @@ function phoneNumberFormatter(number: string): string {
 }
 
 // Get current settings
-router.get('/', authMiddleware, settingsLimiter, async (req: Request, res: Response) => {
+router.get('/', authMiddleware, async (req: Request, res: Response) => {
   try {
     const response: ApiResponse<any> = {
       success: true,
@@ -202,7 +213,7 @@ router.get('/', authMiddleware, settingsLimiter, async (req: Request, res: Respo
 // Update settings
 router.put('/', 
   authMiddleware, 
-  settingsLimiter,
+
   [
     body('whatsappApiUrl').optional().isURL().withMessage('Invalid WhatsApp API URL'),
     body('whatsappApiToken').optional().isString().withMessage('WhatsApp API token must be a string'),
@@ -284,7 +295,7 @@ router.put('/',
 // Send WhatsApp message to personal number
 router.post('/whatsapp/send-personal',
   authMiddleware,
-  settingsLimiter,
+
   [
     body('number').trim().notEmpty().withMessage('Number cannot be empty'),
     body('message').trim().notEmpty().withMessage('Message cannot be empty'),
@@ -351,7 +362,6 @@ router.post('/whatsapp/send-personal',
 // Send WhatsApp message to group
 router.post('/whatsapp/send-group',
   authMiddleware,
-  settingsLimiter,
   [
     body('chatId').optional().isString().withMessage('Chat ID must be a string'),
     body('message').trim().notEmpty().withMessage('Message cannot be empty'),
@@ -429,7 +439,6 @@ router.post('/whatsapp/send-group',
 // Test WhatsApp connection
 router.post('/whatsapp/test',
   authMiddleware,
-  settingsLimiter,
   async (req: Request, res: Response) => {
     try {
       if (!config.whatsappEnabled) {
@@ -479,7 +488,7 @@ router.post('/whatsapp/test',
 );
 
 // WhatsApp-specific settings endpoints
-router.get('/whatsapp', authMiddleware, settingsLimiter, async (req: Request, res: Response) => {
+router.get('/whatsapp', authMiddleware, async (req: Request, res: Response) => {
   try {
     const whatsappSettings = {
       enabled: config.whatsappEnabled || false,
@@ -508,7 +517,6 @@ router.get('/whatsapp', authMiddleware, settingsLimiter, async (req: Request, re
 
 router.put('/whatsapp',
   authMiddleware,
-  settingsLimiter,
   [
     body('enabled').optional().isBoolean().withMessage('Enabled must be a boolean'),
     body('apiUrl').optional().isURL().withMessage('Invalid API URL'),
@@ -572,7 +580,6 @@ router.put('/whatsapp',
 
 router.post('/whatsapp/test-personal',
   authMiddleware,
-  settingsLimiter,
   [
     body('message').optional().trim().isString().withMessage('Message must be a string'),
   ],
@@ -623,7 +630,6 @@ router.post('/whatsapp/test-personal',
 
 router.post('/whatsapp/test-group',
   authMiddleware,
-  settingsLimiter,
   [
     body('message').optional().trim().isString().withMessage('Message must be a string'),
   ],
@@ -674,7 +680,6 @@ router.post('/whatsapp/test-group',
 
 router.post('/whatsapp/test-connection',
   authMiddleware,
-  settingsLimiter,
   async (req: Request, res: Response) => {
     try {
       // Test WhatsApp API connection
@@ -714,7 +719,6 @@ router.post('/whatsapp/test-connection',
 // POST /api/settings/whatsapp/send-report - Send WhatsApp report
 router.post('/whatsapp/send-report',
   authMiddleware,
-  settingsLimiter,
   [
     body('recipients').isArray().withMessage('Recipients must be an array'),
     body('format').isIn(['summary', 'detailed']).withMessage('Format must be summary or detailed'),

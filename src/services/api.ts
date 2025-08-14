@@ -143,7 +143,7 @@ class ApiClient {
   async login(credentials: LoginRequest): Promise<ApiResponse<AuthTokens>> {
     try {
       const response: AxiosResponse<ApiResponse<{ user: any; tokens: AuthTokens }>> = await this.axiosInstance.post(
-        '/api/auth/login',
+        '/auth/login',
         credentials
       );
       
@@ -177,7 +177,7 @@ class ApiClient {
 
     try {
       const response: AxiosResponse<ApiResponse<AuthTokens>> = await this.axiosInstance.post(
-        '/api/auth/refresh',
+        '/auth/refresh',
         { refreshToken: this.refreshToken }
       );
       
@@ -208,7 +208,7 @@ class ApiClient {
   async getDashboardStats(): Promise<ApiResponse<DashboardStats>> {
     try {
       const response: AxiosResponse<ApiResponse<DashboardStats>> = await this.axiosInstance.get(
-        '/api/dashboard/stats'
+        '/dashboard/stats'
       );
       return response.data;
     } catch (error: any) {
@@ -223,7 +223,7 @@ class ApiClient {
   async getJobs(): Promise<ApiResponse<JobStatus[]>> {
     try {
       const response: AxiosResponse<ApiResponse<JobStatus[]>> = await this.axiosInstance.get(
-        '/api/veeam/jobs'
+        '/veeam/jobs'
       );
       return response.data;
     } catch (error: any) {
@@ -238,7 +238,7 @@ class ApiClient {
   async getRepositories(): Promise<ApiResponse<Repository[]>> {
     try {
       const response: AxiosResponse<ApiResponse<Repository[]>> = await this.axiosInstance.get(
-        '/api/veeam/repositories'
+        '/veeam/repositories'
       );
       return response.data;
     } catch (error: any) {
@@ -253,7 +253,7 @@ class ApiClient {
   async getActivity(): Promise<ApiResponse<ActivityItem[]>> {
     try {
       const response: AxiosResponse<ApiResponse<ActivityItem[]>> = await this.axiosInstance.get(
-        '/api/dashboard/activity'
+        '/dashboard/activity'
       );
       return response.data;
     } catch (error: any) {
@@ -284,7 +284,7 @@ class ApiClient {
   async generateTestAlerts(): Promise<ApiResponse<{ message: string }>> {
     try {
       const response: AxiosResponse<ApiResponse<{ message: string }>> = await this.axiosInstance.post(
-        '/api/dashboard/test-alerts'
+        '/dashboard/test-alerts'
       );
       return response.data;
     } catch (error: any) {
@@ -300,7 +300,7 @@ class ApiClient {
   async getWhatsAppSettings(): Promise<ApiResponse<any>> {
     try {
       const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.get(
-        '/api/settings/whatsapp'
+        '/settings/whatsapp'
       );
       
       // Transform defaultRecipients array to string for frontend form compatibility
@@ -338,7 +338,7 @@ class ApiClient {
       };
       
       const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.put(
-        '/api/settings/whatsapp',
+        '/settings/whatsapp',
         transformedSettings
       );
       return response.data;
@@ -354,7 +354,7 @@ class ApiClient {
   async testWhatsAppPersonal(data: { number: string; message: string }): Promise<ApiResponse<any>> {
     try {
       const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.post(
-        '/api/settings/whatsapp/test-personal',
+        '/settings/whatsapp/test-personal',
         data
       );
       return response.data;
@@ -370,7 +370,7 @@ class ApiClient {
   async testWhatsAppGroup(data: { message: string }): Promise<ApiResponse<any>> {
     try {
       const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.post(
-        '/api/settings/whatsapp/test-group',
+        '/settings/whatsapp/test-group',
         data
       );
       return response.data;
@@ -386,7 +386,7 @@ class ApiClient {
   async testWhatsAppConnection(): Promise<ApiResponse<any>> {
     try {
       const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.post(
-        '/api/settings/whatsapp/test-connection'
+        '/settings/whatsapp/test-connection'
       );
       return response.data;
     } catch (error: any) {
@@ -405,7 +405,7 @@ class ApiClient {
   }): Promise<ApiResponse<any>> {
     try {
       const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.post(
-        '/api/settings/whatsapp/send-report',
+        '/settings/whatsapp/send-report',
         data
       );
       return response.data;

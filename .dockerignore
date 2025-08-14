@@ -13,7 +13,9 @@ build
 .env.local
 .env.development
 .env.test
-.env.production
+# Allow .env.production files for deployment
+!.env.production
+!server/.env.production
 
 # IDE files
 .vscode
