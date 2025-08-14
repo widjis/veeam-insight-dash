@@ -50,7 +50,7 @@ http {
 
     # Upstream WebSocket
     upstream websocket {
-        server ${WEBSOCKET_HOST}:${WEBSOCKET_PORT};
+        server ${BACKEND_HOST}:${BACKEND_PORT};
     }
 
     # HTTP Server (No SSL)

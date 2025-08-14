@@ -1104,6 +1104,37 @@ The WebSocket service is working correctly on port 3003. The issue is in the Ngi
 
 ---
 
+## 2025-01-14 - Nginx Template Files Transfer
+
+### 📁 **File Transfer from Docker Server**
+**Time**: 19:06 WIB
+**Source**: Docker server 10.60.10.59 (`/root/veeam-insight-dash/`)
+**Target**: Local project root
+
+#### ✅ **Files Successfully Copied**
+1. **nginx-http.conf.template** (4,874 bytes) - Main Nginx configuration template
+2. **nginx-entrypoint.sh** (1,000 bytes) - Nginx startup script
+3. **nginx.conf** (6,889 bytes) - Generated Nginx configuration
+
+#### 🔧 **Connection Details**
+- **Server**: 10.60.10.59:22
+- **User**: mtiadmin
+- **Working Directory**: `/root/veeam-insight-dash`
+- **Transfer Method**: SSH file copy via MCP server
+
+#### 📋 **File Verification**
+```bash
+$ ls -la nginx*
+-rwxr-xr-x@ 1 widjis  staff  1000 Aug 14 19:06 nginx-entrypoint.sh
+-rw-r--r--@ 1 widjis  staff  4874 Aug 14 19:06 nginx-http.conf.template
+-rw-r--r--@ 1 widjis  staff  6889 Aug 14 19:06 nginx.conf
+```
+
+#### 🎯 **Purpose**
+These files enable local development and debugging of the Nginx configuration issues identified in the WebSocket investigation.
+
+---
+
 ## 2025-08-14 17:04:01 - Hardcoded localhost:3001 References Eliminated
 
 **Issue**: Despite environment variables being correctly set to `localhost:9007`, the built frontend assets still contained hardcoded `localhost:3001` references causing CSP violations.
