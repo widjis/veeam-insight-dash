@@ -9,6 +9,7 @@ const __dirname = path.dirname(__filename);
 // Load environment variables from server/.env.production file (fallback to .env)
 const envPath = path.resolve(__dirname, '..', '..', '.env');
 const envProductionPath = path.resolve(__dirname, '..', '..', '.env.production');
+const serverEnvProductionPath = path.resolve(__dirname, '..', '..', 'server', '.env.production');
 
 // Try to load .env first, then fallback to .env.production
 let envLoaded = false;
@@ -27,8 +28,23 @@ if (!envLoaded) {
     const result = dotenv.config({ path: envProductionPath });
     if (!result.error) {
       console.log('✅ Loaded environment from .env.production file');
+      envLoaded = true;
     } else {
-      console.warn('⚠️  Failed to load .env.production:', result.error);
+      console.log('⚠️  .env.production not found, trying server/.env.production');
+    }
+  } catch (error) {
+    console.log('⚠️  .env.production not found, trying server/.env.production');
+  }
+}
+
+if (!envLoaded) {
+  try {
+    const result = dotenv.config({ path: serverEnvProductionPath });
+    if (!result.error) {
+      console.log('✅ Loaded environment from server/.env.production file');
+      envLoaded = true;
+    } else {
+      console.warn('⚠️  Failed to load server/.env.production:', result.error);
     }
   } catch (error) {
     console.error('❌ Failed to load any environment file:', error);
@@ -40,6 +56,7 @@ console.log('🔍 VEEAM_PASSWORD loaded:', process.env.VEEAM_PASSWORD ? '[SET]' 
 console.log('🔍 Environment file paths:');
 console.log('   .env:', envPath);
 console.log('   .env.production:', envProductionPath);
+console.log('   server/.env.production:', serverEnvProductionPath);
 
 interface Config {
   port: number;

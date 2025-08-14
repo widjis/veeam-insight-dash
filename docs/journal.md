@@ -735,6 +735,41 @@ nginx service:
 
 ---
 
+## 2025-08-14 16:21:00 - Docker Environment Variable Loading Issue
+
+### Issue Identified
+- Connected to Docker server at 10.60.10.59 to debug deployment issues
+- Found containers running but backend showing `VEEAM_PASSWORD not set in environment variables`
+- Despite `.env.production` and `server/.env.production` files containing correct credentials
+- Docker Compose warnings indicate environment variables not being loaded properly
+
+### Investigation Results
+- Verified correct working directory: `/root/veeam-insight-dash`
+- Confirmed `server/.env.production` exists with `VEEAM_PASSWORD=IInd0n3s1@Merdeka!`
+- Docker Compose configuration correctly references both env files
+- Environment files are copied into container during build process
+- Backend application shows environment files loaded but variables still [NOT SET]
+
+### Actions Taken
+1. Navigated to correct working directory `/root/veeam-insight-dash`
+2. Verified container status and logs
+3. Checked environment file contents in both host and container
+4. Performed full rebuild with `--no-cache` flag
+5. Containers rebuilt successfully but issue persists
+
+### Current Status
+- Containers are running and healthy
+- Frontend build completed successfully
+- Backend environment loading mechanism needs investigation
+- Issue appears to be in Node.js environment variable loading logic
+
+### Next Steps
+- Investigate backend environment loading code
+- Check if dotenv configuration is properly reading server/.env.production
+- Consider environment variable precedence in Docker Compose
+
+---
+
 ## 2025-08-14 15:51:00 - Content Security Policy and API URL Fix
 
 **Issue**: Frontend was attempting to connect to `localhost:3001` causing CSP violations and connection failures.
