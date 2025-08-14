@@ -735,5 +735,38 @@ nginx service:
 
 ---
 
+## 2025-08-14 15:51:00 - Content Security Policy and API URL Fix
+
+**Issue**: Frontend was attempting to connect to `localhost:3001` causing CSP violations and connection failures.
+
+**Root Cause**: 
+1. API service fallback URL was hardcoded to `localhost:3001` instead of `localhost:9007`
+2. WebSocket service fallback URL was also pointing to wrong port
+3. Environment variables were correctly set but fallback values were outdated
+
+**Solution**: Updated fallback URLs in both API and WebSocket services to use correct production port.
+
+**Changes Made**:
+- Updated `/.env`: Changed `VITE_API_URL` and `VITE_WS_URL` from port 3001 to 9007
+- Updated `/src/services/api.ts`: Fixed API_BASE_URL fallback to include `/api` suffix and correct port
+- Updated `/src/services/websocket.ts`: Fixed WebSocket URL fallback to use port 9007
+- Rebuilt frontend with `npm run build`
+
+**Technical Details**:
+- API calls now properly route through Nginx proxy on port 9007
+- WebSocket connections use correct port avoiding CSP violations
+- Maintains compatibility with both development and production environments
+
+**Instructions for User**:
+```bash
+# Restart containers to apply frontend changes
+docker compose down
+docker compose up -d
+```
+
+**Status**: ✅ Resolved - CSP violations eliminated, API and WebSocket connections fixed
+
+---
+
 *Last Updated: August 14, 2025*
 *Analyst: TRAE AI Agent*
