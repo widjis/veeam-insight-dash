@@ -358,6 +358,160 @@ The environment files and Docker configuration were using incorrect port mapping
 
 ---
 
+## Docker Compose Architecture Clarification
+**Date:** 2025-08-14 12:45 WIB
+
+### Architecture Overview
+The current Docker Compose setup uses a **hybrid single-container approach** with Nginx reverse proxy:
+
+#### Container Structure:
+1. **`veeam-insight` Container** (Single container for both frontend + backend)
+   - **Backend**: Node.js/Express server running on port 3003
+   - **Frontend**: React build files served via shared volume
+   - **WebSocket**: Running on port 3002
+   - **Build Process**: Multi-stage Dockerfile
+     - Stage 1: Frontend build (Vite + React + TypeScript)
+     - Stage 2: Backend build (Node.js + TypeScript)
+     - Stage 3: Production runtime (combines both)
+
+2. **`nginx` Container** (Reverse proxy + static file server)
+   - **Purpose**: Reverse proxy to backend + serves frontend static files
+   - **Ports**: 9007 (HTTP), 9008 (HTTPS)
+   - **Frontend**: Serves React build files from shared volume
+   - **Backend Proxy**: Routes API calls to `veeam-insight:3003`
+   - **WebSocket Proxy**: Routes WS connections to `veeam-insight:3002`
+
+#### File Flow:
+1. **Frontend Build**: Built in Dockerfile stage 1 → copied to `/app/frontend-dist`
+2. **Runtime**: `entrypoint.sh` copies frontend files to `/app/public` (shared volume)
+3. **Nginx**: Mounts shared volume to serve static files + proxy API calls
+
+#### Why This Architecture?
+- **Simplified Deployment**: Single application container
+- **Production Ready**: Nginx handles static files + SSL termination
+- **Scalable**: Can easily separate frontend/backend later if needed
+- **Efficient**: Shared volume avoids file duplication
+
+### Environment Configuration:
+- **Frontend**: `.env.production` (Vite variables, Nginx config)
+- **Backend**: `server/.env.production` (API secrets, Veeam config)
+- **Docker**: Both env files loaded via `env_file` directive
+
+### Logging Architecture:
+
+#### 🔍 How to Access Different Logs:
+
+**1. Backend Application Logs** (Node.js/Express):
+```bash
+# View live backend logs
+docker logs -f veeam-insight-dashboard
+
+# View backend log files (mounted volume)
+tail -f ./logs/combined.log    # All backend logs
+tail -f ./logs/error.log       # Backend errors only
+```
+
+**2. Frontend Logs** (React/Vite - Client-side):
+```bash
+# Frontend logs appear in browser console
+# Access via: Browser DevTools → Console tab
+
+# For build-time frontend logs:
+docker logs veeam-insight-dashboard | grep -i "frontend\|vite\|react"
+```
+
+**3. Nginx Logs** (Reverse proxy + static files):
+```bash
+# View live nginx logs
+docker logs -f veeam-insight-nginx
+
+# Access nginx log files (if mounted):
+docker exec veeam-insight-nginx tail -f /var/log/nginx/access.log
+docker exec veeam-insight-nginx tail -f /var/log/nginx/error.log
+```
+
+**4. Container System Logs**:
+```bash
+# All containers overview
+docker compose logs -f
+
+# Specific container logs
+docker compose logs -f veeam-insight    # Backend container
+docker compose logs -f nginx            # Nginx container
+```
+
+#### 📊 Log Types & Locations:
+
+| Log Type | Location | Purpose |
+|----------|----------|----------|
+| **Backend App** | `./logs/combined.log` | API requests, business logic, errors |
+| **Backend Errors** | `./logs/error.log` | Backend application errors only |
+| **Frontend Runtime** | Browser Console | React errors, API calls, user interactions |
+| **Nginx Access** | `/var/log/nginx/access.log` | HTTP requests, static file serving |
+| **Nginx Errors** | `/var/log/nginx/error.log` | Proxy errors, SSL issues |
+| **Docker Container** | `docker logs <container>` | Container startup, system-level logs |
+
+#### 🎯 Log Filtering Examples:
+```bash
+# Filter backend API logs
+docker logs veeam-insight-dashboard | grep "API"
+
+# Filter error logs only
+docker logs veeam-insight-dashboard | grep -i "error\|exception"
+
+# Filter WebSocket logs
+docker logs veeam-insight-dashboard | grep -i "websocket\|ws"
+
+# Filter specific service logs
+docker logs veeam-insight-dashboard | grep "VeeamService"
+```
+
+#### 🔧 Log Configuration:
+- **Backend**: Winston logger with file rotation (5MB max, 5 files)
+- **Frontend**: Browser console + build logs during Docker build
+- **Nginx**: Standard access/error logs with custom format
+- **Level**: Configurable via `LOG_LEVEL` environment variable
+
+---
+
+## 2025-08-14 - File Permissions Issue Resolution
+**Date:** 2025-08-14 13:00 WIB
+
+### Problem:
+Application started successfully but encountered file permission error:
+```
+Failed to save tokens: Error: EACCES: permission denied, open '/app/tokens/tokens.json'
+```
+
+### Root Cause:
+- Docker container runs as user `veeam` (UID 1001)
+- Volume mount `./server/tokens:/app/tokens` uses host directory permissions
+- Host directory doesn't have write permissions for UID 1001
+
+### Resolution Steps:
+1. **Fix host directory permissions:**
+   ```bash
+   # On the server
+   sudo chown -R 1001:1001 ./server/tokens
+   sudo chmod -R 755 ./server/tokens
+   ```
+
+2. **Alternative: Create tokens.json with proper permissions:**
+   ```bash
+   # Ensure tokens.json exists with correct permissions
+   touch ./server/tokens/tokens.json
+   sudo chown 1001:1001 ./server/tokens/tokens.json
+   sudo chmod 644 ./server/tokens/tokens.json
+   ```
+
+### Status:
+- ✅ Application successfully connects to Veeam API
+- ✅ Token authentication working
+- ❌ Token persistence failing due to file permissions
+- 🔄 Awaiting permission fix on server
+
+---
+
 ## 2025-08-14 - TypeScript Compilation Issues Resolution
 
 ### Problem Identified

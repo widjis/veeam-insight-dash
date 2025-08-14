@@ -6,8 +6,17 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables from server/.env file
-dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env') });
+// Load environment variables from server/.env.production file (fallback to .env)
+const envPath = path.resolve(__dirname, '..', '..', '.env');
+const envProductionPath = path.resolve(__dirname, '..', '..', '.env.production');
+
+// Try to load .env first, then fallback to .env.production
+try {
+  dotenv.config({ path: envPath });
+} catch (error) {
+  // If .env doesn't exist or can't be read, try .env.production
+  dotenv.config({ path: envProductionPath });
+}
 
 interface Config {
   port: number;

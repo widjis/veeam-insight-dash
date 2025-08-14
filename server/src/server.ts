@@ -7,6 +7,8 @@ import morgan from 'morgan';
 import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
 import { config } from '@/config/environment.js';
 import { logger } from '@/utils/logger.js';
@@ -23,8 +25,19 @@ import { CacheService } from '@/services/CacheService.js';
 import { AlertService } from '@/services/AlertService.js';
 import { MonitoringService } from '@/services/MonitoringService.js';
 
-// Load environment variables
-dotenv.config();
+// Get current directory in ES module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables - try .env first, then .env.production
+const envPath = path.resolve(__dirname, '..', '.env');
+const envProductionPath = path.resolve(__dirname, '..', '.env.production');
+
+try {
+  dotenv.config({ path: envPath });
+} catch (error) {
+  dotenv.config({ path: envProductionPath });
+}
 
 const app = express();
 const server = createServer(app);
