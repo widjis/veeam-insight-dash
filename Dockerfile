@@ -1,6 +1,6 @@
 # Multi-stage Docker build for Veeam Insight Dashboard
 # Stage 1: Frontend Build
-FROM node:18-alpine AS frontend-build
+FROM node:20-alpine AS frontend-build
 
 WORKDIR /app/frontend
 
@@ -26,7 +26,7 @@ COPY eslint.config.js ./
 RUN npm run build
 
 # Stage 2: Backend Build
-FROM node:18-alpine AS backend-build
+FROM node:20-alpine AS backend-build
 
 WORKDIR /app/backend
 
@@ -43,11 +43,8 @@ COPY server/src ./src
 # Build backend TypeScript
 RUN npm run build
 
-# Install production dependencies only
-RUN npm ci --only=production && npm cache clean --force
-
 # Stage 3: Production Runtime
-FROM node:18-alpine AS production
+FROM node:20-alpine AS production
 
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
@@ -62,10 +59,12 @@ WORKDIR /app
 # Copy built frontend assets to a temporary location
 COPY --from=frontend-build --chown=veeam:nodejs /app/frontend/dist ./frontend-dist
 
+# Copy backend package files and install production dependencies
+COPY --from=backend-build --chown=veeam:nodejs /app/backend/package*.json ./
+RUN npm ci --only=production && npm cache clean --force
+
 # Copy built backend
 COPY --from=backend-build --chown=veeam:nodejs /app/backend/dist ./dist
-COPY --from=backend-build --chown=veeam:nodejs /app/backend/node_modules ./node_modules
-COPY --from=backend-build --chown=veeam:nodejs /app/backend/package*.json ./
 
 # Copy environment files
 COPY .env.production /app/.env.production
