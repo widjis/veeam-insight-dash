@@ -1135,6 +1135,49 @@ These files enable local development and debugging of the Nginx configuration is
 
 ---
 
+## 2025-01-14 - Environment Files Security Improvement
+
+### 🔒 **Security Enhancement: .env.production → .env.example**
+**Time**: 19:10 WIB
+
+#### ✅ **Changes Made**
+1. **Removed from Git**: `.env.production` and `server/.env.production` files
+2. **Created Templates**: `.env.example` and `server/.env.example` with sanitized values
+3. **Updated .gitignore**: Added `.env.production` and `server/.env.production` to exclusions
+4. **Sanitized Credentials**: Replaced all sensitive data with placeholder examples
+
+#### 🛡️ **Security Improvements**
+- **No More Exposed Secrets**: Veeam credentials, JWT secrets, and API tokens removed from git
+- **Template-Based Setup**: New developers use `.env.example` as template
+- **Production Safety**: `.env.production` files now ignored by git
+
+#### 📋 **Sanitized Values**
+```bash
+# Before (EXPOSED):
+VEEAM_PASSWORD=IInd0n3s1@Merdeka!
+JWT_SECRET=287ea1b0d4e5818f40cbae87467d01035fab69706ee9cda2829572e20f35f5374838d4e6528fbdfad3ef4993ccfef241baa927790c9bb82aec9214185fe09d23
+WHATSAPP_CHAT_ID=120363123402010871@g.us
+
+# After (SAFE):
+VEEAM_PASSWORD=your-veeam-password
+JWT_SECRET=your-jwt-secret-key-here-generate-a-secure-random-string
+WHATSAPP_CHAT_ID=your-whatsapp-group-id@g.us
+```
+
+#### 🎯 **Setup Instructions for New Developers**
+1. Copy `.env.example` to `.env.production`
+2. Copy `server/.env.example` to `server/.env.production`
+3. Replace placeholder values with actual credentials
+4. Never commit `.env.production` files
+
+#### 📁 **Current Git Status**
+- ✅ `.env.example` - Tracked (safe template)
+- ✅ `server/.env.example` - Tracked (safe template)
+- ❌ `.env.production` - Ignored (contains secrets)
+- ❌ `server/.env.production` - Ignored (contains secrets)
+
+---
+
 ## 2025-08-14 17:04:01 - Hardcoded localhost:3001 References Eliminated
 
 **Issue**: Despite environment variables being correctly set to `localhost:9007`, the built frontend assets still contained hardcoded `localhost:3001` references causing CSP violations.
