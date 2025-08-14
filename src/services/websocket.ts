@@ -94,7 +94,7 @@ class WebSocketService {
   }
 
   private connect(): void {
-    const wsUrl = import.meta.env.VITE_WS_URL || 'http://localhost:3001';
+    const wsUrl = import.meta.env.VITE_WS_URL || 'http://localhost:9007';
     
     this.socket = io(wsUrl, {
       transports: ['websocket', 'polling'],

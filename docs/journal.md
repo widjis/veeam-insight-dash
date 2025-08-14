@@ -655,6 +655,34 @@ src/utils/logger.ts
 
 ---
 
+## 2025-08-14 15:41 - Docker Compose Environment Variables Fix
+
+### Issue: Docker Compose Build Warnings
+- **Problem**: Docker Compose shows warnings during build about missing environment variables:
+  ```
+  WARN[0000] The "VEEAM_BASE_URL" variable is not set. Defaulting to a blank string.
+  WARN[0000] The "VEEAM_USERNAME" variable is not set. Defaulting to a blank string.
+  WARN[0000] The "VEEAM_PASSWORD" variable is not set. Defaulting to a blank string.
+  ```
+- **Root Cause**: Docker Compose needs environment variables in the root `.env` file during build time, not just in `server/.env.production`
+- **Solution**: Added all backend environment variables to the root `.env` file
+
+### Environment Variables Added to Root `.env`:
+- ✅ **Veeam Configuration**: `VEEAM_BASE_URL`, `VEEAM_USERNAME`, `VEEAM_PASSWORD`, `VEEAM_VERIFY_SSL`
+- ✅ **JWT Configuration**: `JWT_SECRET`, `JWT_REFRESH_SECRET`, `JWT_EXPIRES_IN`, `JWT_REFRESH_EXPIRES_IN`
+- ✅ **WhatsApp Integration**: `WHATSAPP_API_URL`, `WHATSAPP_API_TOKEN`, `WHATSAPP_CHAT_ID`, etc.
+- ✅ **Additional Config**: Database, logging, session, rate limiting, and API settings
+
+### Files Modified:
+- `.env`: Added comprehensive backend environment variables for Docker Compose build time
+
+### Architecture Notes:
+- **Dual Configuration**: Environment variables now exist in both root `.env` (for Docker Compose) and `server/.env.production` (for runtime)
+- **Build vs Runtime**: Root `.env` ensures Docker Compose has variables during build, while `server/.env.production` provides runtime configuration
+- **Security**: Both files contain the same sensitive data but serve different purposes in the deployment pipeline
+
+---
+
 ## 2025-08-14 - Docker Compose Environment Configuration Fix
 
 ### Problem Identified
