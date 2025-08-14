@@ -57,7 +57,7 @@ RUN adduser -S veeam -u 1001
 WORKDIR /app
 
 # Copy built frontend assets to a temporary location
-COPY --from=frontend-build --chown=veeam:nodejs /app/frontend/dist ./frontend-dist
+COPY --from=frontend-build --chown=veeam:nodejs /app/frontend/dist /app/public
 
 # Copy backend package files and install production dependencies
 COPY --from=backend-build --chown=veeam:nodejs /app/backend/package*.json ./

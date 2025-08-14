@@ -832,6 +832,278 @@ docker compose up -d
 
 ---
 
+## 2025-08-14 17:40 - Fixed Docker Build Failure (npm ci exit code 4294967295)
+
+### Issue
+Docker build was failing during the backend build stage with `npm ci` returning exit code 4294967295. The error occurred in the `backend-build` stage when trying to install Node.js dependencies.
+
+### Root Cause Analysis
+1. **Node.js Version Mismatch**: Dockerfile was using Node.js 18-alpine while local development used Node.js 23.7.0
+2. **Redundant npm ci Commands**: The backend build stage had two `npm ci` commands which could cause conflicts
+3. **Package Lock Compatibility**: package-lock.json generated with Node.js 23 might have compatibility issues with Node.js 18
+
+### Solution
+1. **Updated Node.js Version**: Changed all Docker stages from `node:18-alpine` to `node:20-alpine`
+2. **Fixed npm ci Logic**: Removed redundant second `npm ci` command from backend build stage
+3. **Optimized Production Stage**: Moved production dependency installation to the production stage
+
+### Technical Implementation
+```dockerfile
+# Before
+FROM node:18-alpine AS frontend-build
+FROM node:18-alpine AS backend-build
+FROM node:18-alpine AS production
+
+# After
+FROM node:20-alpine AS frontend-build
+FROM node:20-alpine AS backend-build
+FROM node:20-alpine AS production
+```
+
+```dockerfile
+# Before (problematic double npm ci)
+RUN npm ci
+RUN npm run build
+RUN npm ci --only=production && npm cache clean --force
+
+# After (clean separation)
+RUN npm ci
+RUN npm run build
+# Production dependencies installed in production stage
+```
+
+### Changes Made
+- Updated all Docker stages to use Node.js 20-alpine
+- Removed redundant `npm ci --only=production` from backend-build stage
+- Moved production dependency installation to production stage with proper ownership
+- Maintained clean separation between build and runtime environments
+
+### Next Steps
+Test the Docker build with: `docker compose build --no-cache`
+
+---
+
+## 2025-08-14 - Nginx Configuration Issues Analysis
+
+### Issue: Nginx Showing Welcome Page Instead of Application
+User reported seeing nginx welcome page on port 9007 instead of the Veeam Insight Dashboard application.
+
+### Root Causes Identified:
+1. **Port Configuration Mismatch**: 
+   - Backend configured to run on port 3003 (correct)
+   - Nginx upstream pointing to `veeam-insight:3003` (correct)
+   - But potential service discovery issues in Docker environment
+
+2. **Service Dependencies**: 
+   - Nginx container depends on `veeam-insight` service
+   - If backend service fails to start, nginx serves default page
+
+3. **Volume Mount Issues**:
+   - Frontend build files mounted via `frontend-dist` volume
+   - If volume is empty, nginx serves default content
+
+4. **Health Check Configuration**:
+   - Backend health check points to `/health` endpoint
+   - Nginx health check only validates configuration, not service availability
+
+### Configuration Analysis:
+- ✅ Nginx template (`nginx-http.conf.template`) correctly configured
+- ✅ Environment variables properly set in `.env.production`
+- ✅ Docker compose service dependencies configured
+- ❓ Backend service startup status unknown
+- ❓ Frontend build volume population status unknown
+
+### Recommended Diagnostics:
+1. Check if `veeam-insight` container is running and healthy
+2. Verify frontend build files are properly copied to shared volume
+3. Check nginx container logs for upstream connection errors
+4. Test backend API endpoints directly on port 3003
+5. Verify WebSocket service on port 3002
+
+### Next Steps:
+1. Check Docker container status: `docker compose ps`
+2. Review container logs: `docker compose logs veeam-insight`
+3. Test backend health: `curl http://localhost:3003/api/health`
+4. Verify nginx upstream connectivity
+
+---
+
+## Backend API Testing Results - August 14, 2025
+
+### Test Summary
+Tested backend API on IP `10.60.10.59` to verify service functionality and identify deployment issues.
+
+### Test Results
+
+#### ✅ Backend Service (Port 3003) - WORKING
+```bash
+# Health endpoint test
+curl http://10.60.10.59:3003/api/health
+# Response: HTTP 200 OK
+{
+  "status": "healthy",
+  "timestamp": "2025-08-14T11:21:25.732Z",
+  "uptime": 506.945719258,
+  "environment": "production"
+}
+```
+
+#### ✅ API Authentication - WORKING
+```bash
+# Dashboard stats endpoint (requires auth)
+curl http://10.60.10.59:3003/api/dashboard/stats
+# Response: HTTP 200 OK with proper error message
+{
+  "success": false,
+  "error": {
+    "message": "Access token is required"
+  }
+}
+```
+
+#### ❌ WebSocket Service (Port 3002) - NOT ACCESSIBLE
+```bash
+# WebSocket endpoint test
+curl http://10.60.10.59:3002/socket.io/
+# Error: Connection refused
+```
+
+#### ❌ Nginx Proxy (Port 80) - MISCONFIGURED
+```bash
+# Nginx proxy test
+curl http://10.60.10.59/api/health
+# Response: HTTP 404 Not Found (OpenResty server)
+```
+
+### Key Findings
+
+1. **Backend Service Status**: ✅ **HEALTHY**
+   - Main API service on port 3003 is running correctly
+   - Authentication system is working
+   - Production environment configured properly
+   - Uptime: ~8.5 minutes
+
+2. **WebSocket Service**: ❌ **DOWN**
+   - Port 3002 is not accessible
+   - Connection refused error
+   - This affects real-time features
+
+3. **Nginx Configuration**: ❌ **MISCONFIGURED**
+   - Port 80 is running OpenResty instead of our Nginx
+   - API routes through Nginx are not working
+   - Frontend serving is likely affected
+
+### Root Cause Analysis
+
+1. **Docker Compose Issue**: The Nginx service in docker-compose.yml may not be running
+2. **Port Conflict**: Another service (OpenResty) is occupying port 80
+3. **Service Dependencies**: WebSocket service may have failed to start
+4. **Network Configuration**: Docker network routing issues
+
+### Immediate Actions Required
+
+1. **Check Docker Services**:
+   ```bash
+   docker ps -a
+   docker-compose ps
+   ```
+
+2. **Review Service Logs**:
+   ```bash
+   docker-compose logs nginx
+   docker-compose logs veeam-insight
+   ```
+
+3. **Restart Services**:
+   ```bash
+   docker-compose down
+   docker-compose up -d
+   ```
+
+4. **Verify Port Usage**:
+   ```bash
+   netstat -tulpn | grep :80
+   netstat -tulpn | grep :3002
+   ```
+
+---
+
+## WebSocket Investigation Results - August 14, 2025
+
+### Problem Identified
+The WebSocket service was not accessible on port 3002 as expected, causing connection refused errors.
+
+### Root Cause Analysis
+
+#### ✅ **WebSocket Service is Actually Working!**
+After investigating the code architecture, I discovered that:
+
+1. **Socket.IO Architecture**: The WebSocketService uses Socket.IO and is attached to the main HTTP server
+2. **Single Port Design**: Both HTTP API and WebSocket run on the same port (3003)
+3. **No Separate WebSocket Server**: There's no standalone WebSocket server on port 3002
+
+#### Test Results
+
+```bash
+# ❌ Direct Socket.IO endpoint (expected 400)
+curl http://10.60.10.59:3003/socket.io/
+# Response: HTTP 400 Bad Request (normal for direct HTTP to Socket.IO)
+
+# ✅ Proper Socket.IO handshake (working!)
+curl "http://10.60.10.59:3003/socket.io/?EIO=4&transport=polling"
+# Response: HTTP 200 OK with Socket.IO session data
+```
+
+### Configuration Analysis
+
+#### Environment Configuration
+- `WS_PORT=3002` in `.env.production` is **misleading**
+- The WebSocketService constructor takes the HTTP server instance
+- Socket.IO runs on the same port as the main application (3003)
+
+#### Code Evidence
+```typescript
+// server/src/server.ts
+const server = createServer(app);
+const wsService = new WebSocketService(server); // Attached to HTTP server
+
+// server/src/services/WebSocketService.ts
+constructor(httpServer: HttpServer) {
+  this.io = new SocketIOServer(httpServer, { ... }); // Same port as HTTP
+}
+```
+
+### The Real Issue
+
+1. **Nginx Configuration Problem**: The WebSocket proxy in Nginx is trying to route to port 3002
+2. **Frontend Configuration**: The frontend might be configured to connect to the wrong port
+3. **Environment Variable Confusion**: `WS_PORT=3002` is not actually used by the WebSocket service
+
+### Solution Required
+
+#### Option 1: Fix Nginx Configuration (Recommended)
+Update `nginx-http.conf.template` to proxy WebSocket to port 3003:
+
+```nginx
+# Current (incorrect)
+location /socket.io/ {
+    proxy_pass http://websocket; # Points to port 3002
+}
+
+# Should be
+location /socket.io/ {
+    proxy_pass http://backend; # Points to port 3003
+}
+```
+
+#### Option 2: Create Separate WebSocket Server
+Modify the server to actually use the `WS_PORT` configuration and run WebSocket on port 3002.
+
+### Immediate Fix
+The WebSocket service is working correctly on port 3003. The issue is in the Nginx proxy configuration that's trying to route WebSocket traffic to a non-existent service on port 3002.
+
+---
+
 ## 2025-08-14 17:04:01 - Hardcoded localhost:3001 References Eliminated
 
 **Issue**: Despite environment variables being correctly set to `localhost:9007`, the built frontend assets still contained hardcoded `localhost:3001` references causing CSP violations.
