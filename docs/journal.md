@@ -474,41 +474,110 @@ docker logs veeam-insight-dashboard | grep "VeeamService"
 
 ---
 
-## 2025-08-14 - File Permissions Issue Resolution
+## 2025-08-14 - Environment Loading & Permissions Issue Resolution
 **Date:** 2025-08-14 13:00 WIB
 
-### Problem:
-Application started successfully but encountered file permission error:
-```
-Failed to save tokens: Error: EACCES: permission denied, open '/app/tokens/tokens.json'
-```
-
-### Root Cause:
-- Docker container runs as user `veeam` (UID 1001)
-- Volume mount `./server/tokens:/app/tokens` uses host directory permissions
-- Host directory doesn't have write permissions for UID 1001
-
-### Resolution Steps:
-1. **Fix host directory permissions:**
-   ```bash
-   # On the server
-   sudo chown -R 1001:1001 ./server/tokens
-   sudo chmod -R 755 ./server/tokens
+### 🚨 **Problems Identified:**
+1. **Token Persistence Issue:**
+   ```
+   Failed to save tokens: Error: EACCES: permission denied, open '/app/tokens/tokens.json'
    ```
 
-2. **Alternative: Create tokens.json with proper permissions:**
-   ```bash
-   # Ensure tokens.json exists with correct permissions
-   touch ./server/tokens/tokens.json
-   sudo chown 1001:1001 ./server/tokens/tokens.json
-   sudo chmod 644 ./server/tokens/tokens.json
+2. **Environment File Copy Issues:**
+   ```
+   cp: can't create '/app/.env': Permission denied
+   cp: can't create '/app/server/.env': Permission denied
    ```
 
-### Status:
-- ✅ Application successfully connects to Veeam API
-- ✅ Token authentication working
-- ❌ Token persistence failing due to file permissions
-- 🔄 Awaiting permission fix on server
+### 🔍 **Root Causes:**
+1. **Token Directory Permissions:**
+   - Docker container runs as user `veeam` (UID 1001) for security
+   - Volume mount `./server/tokens:/app/tokens` uses host directory permissions
+   - Host directory doesn't have write permissions for UID 1001
+
+2. **Environment File Loading:**
+   - Entrypoint script tries to copy `.env.production` to `.env` files
+   - Container user lacks write permissions to create files in `/app/` directory
+   - Application configuration expects `.env` files but can't create them
+
+### ✅ **Resolution Steps:**
+
+#### **1. Fixed Environment Loading Logic:**
+
+**Modified Files:**
+- `server/src/config/environment.ts` - Environment loading logic
+- `server/src/server.ts` - Server environment initialization
+- `entrypoint.sh` - Container startup script
+
+**Changes Made:**
+- Updated environment configuration to load `.env.production` files directly
+- Added fallback logic: try `.env` first, then `.env.production`
+- Modified entrypoint script to handle permission failures gracefully
+- Added warning messages instead of failing on copy errors
+
+#### **2. Host Directory Permissions Fix:**
+```bash
+# Navigate to project directory
+cd ~/veeam-insight-dash
+
+# Fix directory permissions
+sudo chown -R 1001:1001 ./server/tokens
+sudo chmod -R 755 ./server/tokens
+
+# Ensure tokens.json exists with correct permissions
+touch ./server/tokens/tokens.json
+sudo chown 1001:1001 ./server/tokens/tokens.json
+sudo chmod 644 ./server/tokens/tokens.json
+
+# Rebuild and restart containers to apply changes
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+```
+
+### 🔧 **Technical Implementation:**
+
+#### **Environment Loading Strategy:**
+```typescript
+// Before: Fixed path to .env
+dotenv.config({ path: path.resolve(__dirname, '..', '..', '.env') });
+
+// After: Fallback mechanism
+try {
+  dotenv.config({ path: envPath }); // Try .env first
+} catch (error) {
+  dotenv.config({ path: envProductionPath }); // Fallback to .env.production
+}
+```
+
+#### **Entrypoint Script Improvements:**
+```bash
+# Before: Fails on permission error
+cp /app/.env.production /app/.env
+
+# After: Graceful handling
+cp /app/.env.production /app/.env 2>/dev/null || echo "Warning: Could not copy root .env file (using .env.production directly)"
+```
+
+### 📁 **Files Modified:**
+- `server/src/config/environment.ts` - Environment loading logic
+- `server/src/server.ts` - Server environment initialization
+- `entrypoint.sh` - Container startup script
+- Host directory: `./server/tokens` (permissions to be fixed)
+
+### ✅ **Verification Status:**
+- ✅ **Code Changes:** Environment loading fixes implemented
+- ❌ **Pending:** Server access required to apply permission fixes and rebuild
+- 🔄 **Next Steps:** 
+  1. Apply permission commands on production server
+  2. Rebuild Docker containers with updated code
+  3. Verify token persistence and environment loading
+
+### 🎯 **Expected Outcome:**
+- Application loads environment variables from `.env.production` files directly
+- No more permission errors during container startup
+- Token persistence works correctly with proper file permissions
+- Graceful fallback handling for environment configuration
 
 ---
 

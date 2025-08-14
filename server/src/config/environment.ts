@@ -11,12 +11,35 @@ const envPath = path.resolve(__dirname, '..', '..', '.env');
 const envProductionPath = path.resolve(__dirname, '..', '..', '.env.production');
 
 // Try to load .env first, then fallback to .env.production
+let envLoaded = false;
 try {
-  dotenv.config({ path: envPath });
+  const result = dotenv.config({ path: envPath });
+  if (!result.error) {
+    console.log('✅ Loaded environment from .env file');
+    envLoaded = true;
+  }
 } catch (error) {
-  // If .env doesn't exist or can't be read, try .env.production
-  dotenv.config({ path: envProductionPath });
+  console.log('⚠️  .env file not found, trying .env.production');
 }
+
+if (!envLoaded) {
+  try {
+    const result = dotenv.config({ path: envProductionPath });
+    if (!result.error) {
+      console.log('✅ Loaded environment from .env.production file');
+    } else {
+      console.warn('⚠️  Failed to load .env.production:', result.error);
+    }
+  } catch (error) {
+    console.error('❌ Failed to load any environment file:', error);
+  }
+}
+
+// Debug: Check if VEEAM_PASSWORD is loaded
+console.log('🔍 VEEAM_PASSWORD loaded:', process.env.VEEAM_PASSWORD ? '[SET]' : '[NOT SET]');
+console.log('🔍 Environment file paths:');
+console.log('   .env:', envPath);
+console.log('   .env.production:', envProductionPath);
 
 interface Config {
   port: number;
