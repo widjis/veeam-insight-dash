@@ -3960,5 +3960,51 @@ if (recentFailures > 0 || failureRate > 0) {
 
 ---
 
-*Last Updated: August 15, 2025 at 23:36 WIB*
+## Failed/Warning Jobs Display Fix - COMPLETED (23:40 WIB)
+
+### Problem Identified
+- **Issue**: WhatsApp reports showing failure/warning rates but not displaying actual failed/warning job details
+- **User Feedback**: "you still not showing failed or warning job here" despite 5.88% failure rate
+- **Root Cause**: Inconsistent job status filtering logic in analytics calculation vs. display logic
+
+### Technical Analysis
+- **Analytics Calculation**: Only checked `job.result === 'Failed'` for counting failures
+- **Display Logic**: Checked both `job.result === 'Failed' || job.lastResult === 'Failed'` for showing details
+- **Result**: Analytics showed 0 recent failures, so Performance Trends section was skipped entirely
+
+### Solution Implemented
+- **Fixed Analytics Logic**: Updated `recentFailures` and `recentWarnings` calculations to check both `job.result` and `job.lastResult`
+- **Consistent Filtering**: Ensured same logic across WhatsApp text reports and image reports
+- **Files Modified**: 
+  - `server/src/routes/whatsapp.ts` (lines 318-319)
+  - `server/src/services/ImageGenerationService.ts` (lines 829-830)
+
+### Code Changes
+```typescript
+// Before (inconsistent)
+const recentFailures = jobs.filter((job: any) => job.result === 'Failed').length
+const recentWarnings = jobs.filter((job: any) => job.result === 'Warning').length
+
+// After (consistent)
+const recentFailures = jobs.filter((job: any) => job.result === 'Failed' || job.lastResult === 'Failed').length
+const recentWarnings = jobs.filter((job: any) => job.result === 'Warning' || job.lastResult === 'Warning').length
+```
+
+### Results
+- ✅ **Fixed Display Issue**: Failed and warning jobs now properly appear in Performance Trends section
+- ✅ **Consistent Logic**: Same filtering logic used for counting and displaying jobs
+- ✅ **Enhanced Visibility**: Users can now see specific failed job names, types, and error messages
+- ✅ **Complete Information**: Reports now show both summary statistics and detailed job information
+
+### Impact
+- **RESOLVED** - Failed and warning jobs are now properly displayed with full details
+- **IMPROVED** - Consistent job status detection across all report formats
+- **ENHANCED** - Better troubleshooting information for administrators
+
+### Status
+**COMPLETED** - Failed/warning jobs display issue resolved
+
+---
+
+*Last Updated: August 15, 2025 at 23:40 WIB*
 *Analyst: TRAE AI Agent*

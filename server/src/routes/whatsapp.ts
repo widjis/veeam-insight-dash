@@ -315,8 +315,8 @@ router.post('/send-report', async (req, res) => {
       const healthyRepos = repositories.filter((repo: any) => (repo.usagePercent || 0) <= 70).length
       
       // Performance trends (based on job results)
-      const recentFailures = jobs.filter((job: any) => job.result === 'Failed').length
-      const recentWarnings = jobs.filter((job: any) => job.result === 'Warning').length
+      const recentFailures = jobs.filter((job: any) => job.result === 'Failed' || job.lastResult === 'Failed').length
+      const recentWarnings = jobs.filter((job: any) => job.result === 'Warning' || job.lastResult === 'Warning').length
       
       // System health score (0-100)
        let healthScore = 100

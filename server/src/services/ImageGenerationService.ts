@@ -826,8 +826,8 @@ export class ImageGenerationService {
 
     // Determine dynamic icon based on system status
     let reportIcon = '✅' // Default: green checkmark for healthy system
-    const recentFailures = jobs.filter((job: any) => job.result === 'Failed').length
-    const recentWarnings = jobs.filter((job: any) => job.result === 'Warning').length
+    const recentFailures = jobs.filter((job: any) => job.result === 'Failed' || job.lastResult === 'Failed').length
+    const recentWarnings = jobs.filter((job: any) => job.result === 'Warning' || job.lastResult === 'Warning').length
     
     if (recentFailures > 0 || failureRate > 0) {
       reportIcon = '🚨' // Red alert for failures
