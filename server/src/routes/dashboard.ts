@@ -101,7 +101,8 @@ async function calculateDashboardStats(): Promise<DashboardStats> {
 // GET /api/dashboard/stats - Get dashboard statistics
 router.get('/stats', async (req: Request, res: Response) => {
   try {
-    const stats = await cacheService.get<DashboardStats>('dashboard:stats');
+    // First try to get from monitoring service cache (dashboard_stats)
+    let stats = await cacheService.get<DashboardStats>('dashboard_stats');
     
     if (stats !== null) {
       const response: ApiResponse<DashboardStats> = {
@@ -112,9 +113,21 @@ router.get('/stats', async (req: Request, res: Response) => {
       return res.json(response);
     }
 
-    // Calculate fresh stats
+    // Fallback: try the old cache key
+    stats = await cacheService.get<DashboardStats>('dashboard:stats');
+    
+    if (stats !== null) {
+      const response: ApiResponse<DashboardStats> = {
+        success: true,
+        data: stats,
+        timestamp: new Date().toISOString(),
+      };
+      return res.json(response);
+    }
+
+    // Calculate fresh stats if not in cache
     const freshStats = await calculateDashboardStats();
-    cacheService.set('dashboard:stats', freshStats, CACHE_TTL.stats);
+    await cacheService.set('dashboard_stats', freshStats, CACHE_TTL.stats);
 
     const response: ApiResponse<DashboardStats> = {
       success: true,

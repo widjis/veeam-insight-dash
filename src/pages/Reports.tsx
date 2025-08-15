@@ -435,6 +435,42 @@ const Reports = () => {
         description: `Sending ${report.name} via WhatsApp...`,
       })
 
+      // Fetch current data for the report
+      console.log('Fetching data for WhatsApp report...')
+      
+      // Fetch dashboard stats
+      const dashboardResponse = await apiClient.getDashboardStats()
+      console.log('Dashboard response:', dashboardResponse)
+      
+      // Fetch jobs data
+      const jobsResponse = await apiClient.getJobs()
+      console.log('Jobs response:', jobsResponse)
+      
+      // Fetch repositories data
+      const reposResponse = await apiClient.getRepositories()
+      console.log('Repositories response:', reposResponse)
+      
+      // Generate comprehensive report data
+      const reportData = {
+        summary: {
+          totalJobs: jobsResponse.data?.length || 0,
+          successfulJobs: jobsResponse.data?.filter((job: any) => job.status === 'Success').length || 0,
+          failedJobs: jobsResponse.data?.filter((job: any) => job.status === 'Failed').length || 0,
+          warningJobs: jobsResponse.data?.filter((job: any) => job.status === 'Warning').length || 0,
+          totalRepositories: reposResponse.data?.length || 0,
+          totalCapacity: reposResponse.data?.reduce((sum: number, repo: any) => sum + (repo.capacity || 0), 0) || 0,
+          usedCapacity: reposResponse.data?.reduce((sum: number, repo: any) => sum + (repo.used || 0), 0) || 0
+        },
+        dateRange: {
+          startDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+          endDate: new Date().toISOString()
+        },
+        jobs: jobsResponse.data || [],
+        repositories: reposResponse.data || []
+      }
+      
+      console.log('Generated report data:', reportData)
+
       // Send the report via WhatsApp
       const recipients = Array.isArray(whatsappSettings.data.defaultRecipients) 
         ? whatsappSettings.data.defaultRecipients 
@@ -444,6 +480,7 @@ const Reports = () => {
         format: 'summary',
         reportType: report.type as 'daily' | 'weekly' | 'monthly',
         useImageReport: false, // Default to text report for historical reports
+        reportData
       })
 
       if (result.success) {

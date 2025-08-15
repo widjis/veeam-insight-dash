@@ -145,6 +145,7 @@ export class MonitoringService {
       let jobs: VeeamJobState[] = [];
       if (jobsResult.status === 'fulfilled' && jobsResult.value.success) {
         jobs = jobsResult.value.data || [];
+        logger.info(`Fetched ${jobs.length} jobs from Veeam API`);
         await this.cacheService.set('jobs', jobs, 300); // Cache for 5 minutes
         this.webSocketService.broadcastJobsUpdate(jobs);
       } else {
@@ -155,6 +156,7 @@ export class MonitoringService {
       let repositories: VeeamRepositoryState[] = [];
       if (repositoriesResult.status === 'fulfilled' && repositoriesResult.value.success) {
         repositories = repositoriesResult.value.data || [];
+        logger.info(`Fetched ${repositories.length} repositories from Veeam API`);
         await this.cacheService.set('repositories', repositories, 300);
         this.webSocketService.broadcastRepositoriesUpdate(repositories);
       } else {
@@ -172,6 +174,15 @@ export class MonitoringService {
 
       // Generate dashboard statistics
       const dashboardStats = this.generateDashboardStats(jobs, repositories, sessions);
+      logger.info('Generated dashboard stats:', {
+        totalJobs: dashboardStats.totalJobs,
+        successfulJobs: dashboardStats.successfulJobs,
+        failedJobs: dashboardStats.failedJobs,
+        totalRepositories: dashboardStats.totalRepositories,
+        totalCapacityTB: dashboardStats.totalCapacityTB,
+        usedCapacityTB: dashboardStats.usedCapacityTB,
+        capacityUsagePercent: dashboardStats.capacityUsagePercent
+      });
       await this.cacheService.set('dashboard_stats', dashboardStats, 60); // Cache for 1 minute
       this.webSocketService.broadcastDashboardStats(dashboardStats);
 

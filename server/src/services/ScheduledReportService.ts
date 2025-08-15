@@ -255,26 +255,23 @@ export class ScheduledReportService {
       // Calculate date range
       const { startDate, endDate } = this.calculateDateRange(report.dateRange, report.customDays);
       
-      // Generate report data (mock implementation)
+      // Generate report data using real data from monitoring service
       const reportData = {
         success: true,
-        data: {
-          summary: {
-            totalJobs: 0,
-            successfulJobs: 0,
-            failedJobs: 0,
-            warningJobs: 0,
-            totalRepositories: 0,
-            totalAlerts: 0
-          },
-          jobs: [],
-          repositories: [],
-          alerts: [],
-          dateRange: {
-            startDate: startDate.toISOString().split('T')[0],
-            endDate: endDate.toISOString().split('T')[0]
-          }
-        }
+        data: await generateReportData({
+          type: report.reportType === 'detailed' ? 'detailed' : 'summary',
+          startDate,
+          endDate,
+          includeJobs: report.includeJobs,
+          includeRepositories: report.includeRepositories,
+          includeAlerts: report.includeAlerts
+        })
+      };
+      
+      // Add date range to the data
+      reportData.data.dateRange = {
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0]
       };
 
       if (!reportData.success) {
@@ -436,45 +433,48 @@ export class ScheduledReportService {
     const summary = reportData.summary || {};
     const dateRange = `${reportData.dateRange?.startDate || 'N/A'} to ${reportData.dateRange?.endDate || 'N/A'}`;
     
-    if (report.delivery.whatsapp.format === 'summary') {
-      return `🔄 *${report.name}*\n\n` +
-             `📅 Period: ${dateRange}\n\n` +
-             `📊 *Summary:*\n` +
-             `• Total Jobs: ${summary.totalJobs || 0}\n` +
-             `• ✅ Successful: ${summary.successfulJobs || 0}\n` +
-             `• ❌ Failed: ${summary.failedJobs || 0}\n` +
-             `• ⚠️ Warnings: ${summary.warningJobs || 0}\n` +
-             `• 💾 Repositories: ${summary.totalRepositories || 0}\n` +
-             `• 🚨 Active Alerts: ${summary.totalAlerts || 0}\n\n` +
-             `Generated: ${new Date().toLocaleString()}`;
-    } else {
-      // Detailed format
-      let message = `🔄 *${report.name}*\n\n` +
-                   `📅 Period: ${dateRange}\n\n` +
-                   `📊 *Summary:*\n` +
-                   `• Total Jobs: ${summary.totalJobs || 0}\n` +
-                   `• ✅ Successful: ${summary.successfulJobs || 0}\n` +
-                   `• ❌ Failed: ${summary.failedJobs || 0}\n` +
-                   `• ⚠️ Warnings: ${summary.warningJobs || 0}\n\n`;
-      
-      // Add failed jobs details if any
-      if (reportData.jobs && summary.failedJobs > 0) {
-        const failedJobs = reportData.jobs.filter((job: any) => job.status === 'Failed');
-        if (failedJobs.length > 0) {
-          message += `❌ *Failed Jobs:*\n`;
-          failedJobs.slice(0, 5).forEach((job: any) => {
-            message += `• ${job.name || 'Unknown'}: ${job.lastRun || 'N/A'}\n`;
-          });
-          if (failedJobs.length > 5) {
-            message += `• ... and ${failedJobs.length - 5} more\n`;
-          }
-          message += '\n';
-        }
-      }
-      
-      message += `Generated: ${new Date().toLocaleString()}`;
-      return message;
+    let message = `🔄 *${report.name}*\n\n` +
+                 `📅 Period: ${dateRange}\n\n` +
+                 `📊 *Summary:*\n` +
+                 `• Total Jobs: ${summary.totalJobs || 0}\n` +
+                 `• ✅ Successful: ${summary.successfulJobs || 0}\n` +
+                 `• ❌ Failed: ${summary.failedJobs || 0}\n` +
+                 `• ⚠️ Warnings: ${summary.warningJobs || 0}\n` +
+                 `• 🚨 Active Alerts: ${summary.totalAlerts || 0}\n\n`;
+    
+    // Add repository details
+    if (reportData.repositories && reportData.repositories.length > 0) {
+      message += `💾 *Repositories:*\n`;
+      reportData.repositories.forEach((repo: any) => {
+        const capacityGB = repo.capacity || repo.capacityGB || 0;
+        const usedGB = repo.used || repo.usedSpaceGB || 0;
+        const capacityTB = (capacityGB / 1024).toFixed(2);
+        const usedTB = (usedGB / 1024).toFixed(2);
+        const usagePercent = capacityGB > 0 ? ((usedGB / capacityGB) * 100).toFixed(1) : '0';
+        
+        message += `• ${repo.name || 'Unknown'}: ${usedTB}TB / ${capacityTB}TB (${usagePercent}%)\n`;
+      });
+      message += `\n`;
     }
+    
+    // Add failed jobs details if any (for both summary and detailed formats)
+    if (reportData.jobs && summary.failedJobs > 0) {
+      const failedJobs = reportData.jobs.filter((job: any) => job.lastResult === 'Failed');
+      if (failedJobs.length > 0) {
+        message += `🚨 *Failed Jobs:*\n`;
+        const jobsToShow = report.delivery.whatsapp.format === 'summary' ? failedJobs.slice(0, 3) : failedJobs.slice(0, 5);
+        jobsToShow.forEach((job: any) => {
+          message += `• ${job.name || 'Unknown Job'}: ${job.message || 'No details available'}\n`;
+        });
+        if (failedJobs.length > jobsToShow.length) {
+          message += `• ... and ${failedJobs.length - jobsToShow.length} more\n`;
+        }
+        message += '\n';
+      }
+    }
+    
+    message += `Generated: ${new Date().toLocaleString()}`;
+    return message;
   }
 
   private normalizePhoneNumber(phoneNumber: string): string {

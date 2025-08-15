@@ -497,7 +497,11 @@ const Settings = () => {
 
   const handleSendWhatsAppNow = async () => {
     try {
+      console.log('Starting WhatsApp send process...')
+      
       const whatsappRecipients = form.getValues("reporting.whatsappRecipients")
+      console.log('WhatsApp recipients:', whatsappRecipients)
+      
       if (!whatsappRecipients || whatsappRecipients.trim() === "") {
         toast({
           title: "WhatsApp Recipients Required",
@@ -509,6 +513,7 @@ const Settings = () => {
 
       // Parse recipients (comma-separated)
       const recipients = whatsappRecipients.split(',').map(r => r.trim()).filter(r => r.length > 0)
+      console.log('Parsed recipients:', recipients)
       
       if (recipients.length === 0) {
         toast({
@@ -524,12 +529,63 @@ const Settings = () => {
         description: `Sending report to ${recipients.length} recipient(s)...`,
       })
 
+      // Fetch dashboard data for report
+      console.log('Fetching dashboard data...')
+      const dashboardResponse = await apiClient.getDashboardStats()
+      console.log('Dashboard response:', dashboardResponse)
+      
+      if (!dashboardResponse.success) {
+        throw new Error('Failed to fetch dashboard data')
+      }
+
+      // Fetch jobs data
+      console.log('Fetching jobs data...')
+      const jobsResponse = await apiClient.getJobs()
+      console.log('Jobs response:', jobsResponse)
+      
+      if (!jobsResponse.success) {
+        throw new Error('Failed to fetch jobs data')
+      }
+
+      // Fetch repositories data
+      console.log('Fetching repositories data...')
+      const reposResponse = await apiClient.getRepositories()
+      console.log('Repositories response:', reposResponse)
+      
+      if (!reposResponse.success) {
+        throw new Error('Failed to fetch repositories data')
+      }
+
+      // Generate report data
+      const reportData = {
+        summary: {
+          totalJobs: jobsResponse.data?.length || 0,
+          successfulJobs: jobsResponse.data?.filter((job: any) => job.lastResult === 'Success').length || 0,
+          failedJobs: jobsResponse.data?.filter((job: any) => job.lastResult === 'Failed').length || 0,
+          warningJobs: jobsResponse.data?.filter((job: any) => job.lastResult === 'Warning').length || 0,
+          totalRepositories: reposResponse.data?.length || 0,
+          totalCapacity: reposResponse.data?.reduce((sum: number, repo: any) => sum + (repo.capacity || 0), 0) || 0,
+          usedCapacity: reposResponse.data?.reduce((sum: number, repo: any) => sum + (repo.used || 0), 0) || 0
+        },
+        dateRange: {
+          startDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString(), // Last 24 hours
+          endDate: new Date().toLocaleDateString()
+        },
+        jobs: jobsResponse.data || [],
+        repositories: reposResponse.data || []
+      }
+      
+      console.log('Generated report data:', reportData)
+
       const result = await apiClient.sendWhatsAppReport({
         recipients,
         format: form.getValues("reporting.whatsappFormat") || "summary",
         reportType: 'daily',
-        useImageReport: form.getValues("reporting.whatsappImageReport") || false
+        useImageReport: form.getValues("reporting.whatsappImageReport") || false,
+        reportData
       })
+      
+      console.log('WhatsApp send result:', result)
 
       if (result.success) {
         toast({
