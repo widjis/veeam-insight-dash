@@ -95,11 +95,16 @@ class WebSocketService {
 
   private connect(): void {
     const wsUrl = import.meta.env.VITE_WS_URL || window.location.origin;
+    console.log('WebSocket connecting to:', wsUrl);
     
     this.socket = io(wsUrl, {
       transports: ['websocket', 'polling'],
-      timeout: 20000,
+      timeout: 30000,
       forceNew: true,
+      autoConnect: true,
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 5
     });
 
     this.setupEventListeners();

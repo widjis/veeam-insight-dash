@@ -215,7 +215,7 @@ router.put('/',
   authMiddleware, 
 
   [
-    body('whatsappApiUrl').optional().isURL().withMessage('Invalid WhatsApp API URL'),
+    body('whatsappApiUrl').optional().isURL({ require_protocol: true, allow_underscores: true }).withMessage('Invalid WhatsApp API URL'),
     body('whatsappApiToken').optional().isString().withMessage('WhatsApp API token must be a string'),
     body('whatsappChatId').optional().isString().withMessage('WhatsApp chat ID must be a string'),
     body('whatsappEnabled').optional().isBoolean().withMessage('WhatsApp enabled must be a boolean'),
@@ -519,18 +519,22 @@ router.put('/whatsapp',
   authMiddleware,
   [
     body('enabled').optional().isBoolean().withMessage('Enabled must be a boolean'),
-    body('apiUrl').optional().isURL().withMessage('Invalid API URL'),
+    body('apiUrl').optional().isURL({ require_protocol: true, allow_underscores: true }).withMessage('Invalid API URL'),
     body('apiToken').optional().isString().withMessage('API token must be a string'),
     body('chatId').optional().isString().withMessage('Chat ID must be a string'),
     body('defaultRecipients').optional().isArray().withMessage('Default recipients must be an array'),
   ],
   async (req: Request, res: Response) => {
     try {
+      // Log the request body for debugging
+      logger.info('WhatsApp settings update request body:', JSON.stringify(req.body, null, 2));
+      
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        logger.error('WhatsApp settings validation errors:', errors.array());
         const response: ApiResponse<null> = {
           success: false,
-          error: `Validation error: ${errors.array().map(e => e.msg).join(', ')}`,
+          error: `Validation error: ${errors.array().map(e => `${e.type === 'field' ? e.path : 'unknown'}: ${e.msg}`).join(', ')}`,
           timestamp: new Date().toISOString(),
         };
         return res.status(400).json(response);
@@ -589,7 +593,7 @@ router.post('/whatsapp/test-personal',
       if (!errors.isEmpty()) {
         const response: ApiResponse<null> = {
           success: false,
-          error: `Validation error: ${errors.array().map(e => e.msg).join(', ')}`,
+          error: `Validation error: ${errors.array().map(e => `${e.type === 'field' ? e.path : 'unknown'}: ${e.msg}`).join(', ')}`,
           timestamp: new Date().toISOString(),
         };
         return res.status(400).json(response);
@@ -639,7 +643,7 @@ router.post('/whatsapp/test-group',
       if (!errors.isEmpty()) {
         const response: ApiResponse<null> = {
           success: false,
-          error: `Validation error: ${errors.array().map(e => e.msg).join(', ')}`,
+          error: `Validation error: ${errors.array().map(e => `${e.type === 'field' ? e.path : 'unknown'}: ${e.msg}`).join(', ')}`,
           timestamp: new Date().toISOString(),
         };
         return res.status(400).json(response);
@@ -726,12 +730,12 @@ router.post('/whatsapp/send-report',
   ],
   async (req: Request, res: Response) => {
     const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      const response: ApiResponse<null> = {
-        success: false,
-        error: `Validation failed: ${errors.array().map(e => e.msg).join(', ')}`,
-        timestamp: new Date().toISOString(),
-      };
+      if (!errors.isEmpty()) {
+        const response: ApiResponse<null> = {
+          success: false,
+          error: `Validation failed: ${errors.array().map(e => `${e.type === 'field' ? e.path : 'unknown'}: ${e.msg}`).join(', ')}`,
+          timestamp: new Date().toISOString(),
+        };
       return res.status(400).json(response);
     }
 

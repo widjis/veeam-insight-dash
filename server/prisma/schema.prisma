@@ -1,0 +1,249 @@
+// Veeam Insight Dashboard - Database Schema
+// PostgreSQL database schema for storing configurations and system data
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// VEEAM CONFIGURATION MODELS
+// ============================================================================
+
+// Main Veeam server configuration
+model VeeamConfig {
+  id              String   @id @default(cuid())
+  name            String   @unique // Friendly name for this configuration
+  baseUrl         String   // Veeam server URL
+  apiVersion      String   @default("1.1-rev1")
+  username        String   // Veeam username
+  password        String   // Encrypted password
+  verifySSL       Boolean  @default(false)
+  isActive        Boolean  @default(true)
+  isDefault       Boolean  @default(false) // Only one can be default
+  description     String?
+  tags            String[] // For categorization
+  
+  // Connection settings
+  timeout         Int      @default(30000) // Connection timeout in ms
+  retryAttempts   Int      @default(3)
+  retryDelay      Int      @default(5000) // Retry delay in ms
+  
+  // Monitoring settings
+  monitoringEnabled Boolean @default(true)
+  alertsEnabled     Boolean @default(true)
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       String?  // User who created this config
+  lastUsed        DateTime?
+  
+  // Relations
+  alertRules      AlertRule[]
+  auditLogs       AuditLog[]
+  
+  @@map("veeam_configs")
+}
+
+// ============================================================================
+// ALERT AND NOTIFICATION MODELS
+// ============================================================================
+
+// Alert rules configuration
+model AlertRule {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  ruleType        AlertType
+  severity        AlertSeverity
+  isEnabled       Boolean  @default(true)
+  
+  // Rule conditions (JSON)
+  conditions      Json     // Flexible conditions storage
+  
+  // Notification settings
+  notifyEmail     Boolean  @default(false)
+  notifyWhatsApp  Boolean  @default(false)
+  notifyWebhook   Boolean  @default(false)
+  
+  // Email settings
+  emailRecipients String[] // Array of email addresses
+  
+  // WhatsApp settings
+  whatsappRecipients String[] // Array of phone numbers
+  
+  // Webhook settings
+  webhookUrl      String?
+  webhookHeaders  Json?    // Custom headers for webhook
+  
+  // Timing settings
+  cooldownMinutes Int      @default(60) // Minimum time between alerts
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       String?
+  
+  // Relations
+  veeamConfigId   String?
+  veeamConfig     VeeamConfig? @relation(fields: [veeamConfigId], references: [id], onDelete: SetNull)
+  alerts          Alert[]
+  
+  @@map("alert_rules")
+}
+
+// Alert instances
+model Alert {
+  id              String   @id @default(cuid())
+  ruleId          String
+  alertRule       AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  
+  title           String
+  message         String
+  severity        AlertSeverity
+  alertType       AlertType
+  
+  // Alert status
+  status          AlertStatus @default(ACTIVE)
+  acknowledgedAt  DateTime?
+  acknowledgedBy  String?
+  resolvedAt      DateTime?
+  resolvedBy      String?
+  
+  // Alert data (JSON)
+  metadata        Json?    // Additional alert data
+  
+  // Notification tracking
+  emailSent       Boolean  @default(false)
+  whatsappSent    Boolean  @default(false)
+  webhookSent     Boolean  @default(false)
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("alerts")
+}
+
+// ============================================================================
+// USER AND SYSTEM CONFIGURATION MODELS
+// ============================================================================
+
+// User settings and preferences
+model UserSetting {
+  id              String   @id @default(cuid())
+  userId          String   // User identifier (from JWT or auth system)
+  category        String   // Settings category (dashboard, notifications, etc.)
+  key             String   // Setting key
+  value           Json     // Setting value (flexible JSON)
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([userId, category, key])
+  @@map("user_settings")
+}
+
+// System-wide configuration
+model SystemConfig {
+  id              String   @id @default(cuid())
+  category        String   // Config category
+  key             String   // Config key
+  value           Json     // Config value
+  description     String?
+  isSecret        Boolean  @default(false) // Whether this is sensitive data
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  updatedBy       String?
+  
+  @@unique([category, key])
+  @@map("system_configs")
+}
+
+// ============================================================================
+// AUDIT AND LOGGING MODELS
+// ============================================================================
+
+// Audit log for tracking changes
+model AuditLog {
+  id              String   @id @default(cuid())
+  entityType      String   // Type of entity (VeeamConfig, AlertRule, etc.)
+  entityId        String   // ID of the entity
+  action          AuditAction
+  
+  // Change details
+  oldValues       Json?    // Previous values
+  newValues       Json?    // New values
+  changes         String[] // List of changed fields
+  
+  // User context
+  userId          String?
+  userEmail       String?
+  ipAddress       String?
+  userAgent       String?
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  
+  // Relations
+  veeamConfigId   String?
+  veeamConfig     VeeamConfig? @relation(fields: [veeamConfigId], references: [id], onDelete: SetNull)
+  
+  @@map("audit_logs")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum AlertType {
+  JOB_FAILED
+  JOB_WARNING
+  REPOSITORY_FULL
+  REPOSITORY_WARNING
+  SERVER_OFFLINE
+  BACKUP_OVERDUE
+  CUSTOM
+  
+  @@map("alert_type")
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+  
+  @@map("alert_severity")
+}
+
+enum AlertStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESOLVED
+  SUPPRESSED
+  
+  @@map("alert_status")
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  CONFIG_CHANGE
+  ALERT_ACKNOWLEDGE
+  ALERT_RESOLVE
+  
+  @@map("audit_action")
+}

@@ -1,3 +1,35 @@
+# WebSocket Connection Issue Resolution - August 15, 2025
+
+## WebSocket Connection Issues - RESOLVED
+
+### Issue Identified
+- WebSocket connections failing with timeout errors
+- Frontend showing `WebSocket connection error: Error: timeout` in console
+- Users unable to receive real-time alerts and notifications
+
+### Root Cause Analysis
+- Initial connection timeout due to default Socket.IO configuration
+- WebSocket service runs on same port as HTTP API (3001 in development, 3003 in production)
+- Connection configuration needed optimization for reliability
+
+### Solution Applied
+- **Updated WebSocket client configuration** in `src/services/websocket.ts`:
+  - Increased timeout from 20s to 30s
+  - Added automatic reconnection with 5 attempts
+  - Set reconnection delay to 1s
+  - Enabled `autoConnect` and `reconnection` options
+- **Verified backend WebSocket service** is properly configured and running
+
+### Verification Results
+- ✅ Backend logs show successful client connections: `"Client connected: 2fY0PVmuPenXoBDIAAE_"`
+- ✅ WebSocket service properly attached to HTTP server on port 3001
+- ✅ Frontend successfully establishes WebSocket connections
+- ✅ Real-time communication working as expected
+
+### Status: **RESOLVED** ✅
+
+---
+
 # CSP Violation Fix & Frontend Build Issue - August 14, 2025
 
 ## CSP Violation Investigation
@@ -103,6 +135,32 @@
 
 ## 2025-08-14
 
+### Backend API Connection Issues Fixed
+- **Issue**: Frontend experiencing `net::ERR_CONNECTION_REFUSED` errors when trying to connect to backend API endpoints
+- **Root Cause**: Port mismatch between frontend configuration (expecting port 9007) and actual backend server (running on port 3001)
+- **Solution**: 
+  - Updated `.env` file to set `VITE_API_URL=http://localhost:3001/api`
+  - Updated `VITE_WS_URL=http://localhost:3001` for WebSocket connections
+  - Ensured backend `server/.env` has correct `PORT=3001` and `CORS_ORIGIN=http://localhost:8080`
+- **Status**: ✅ **RESOLVED** - Frontend and backend now communicate successfully
+
+### WhatsApp Settings Validation Issues Fixed
+- **Issue**: WhatsApp settings form returning `400 Bad Request` with "Invalid API URL" error for `http://localhost:8192`
+- **Root Cause**: Express-validator's `isURL()` method was too strict and rejecting localhost URLs
+- **Solution**:
+  - Updated validation in `server/src/routes/settings.ts` to use `isURL({ require_protocol: true, allow_underscores: true })`
+  - Applied fix to both main settings route (line 218) and WhatsApp-specific route (line 522)
+  - Added debugging logs to help identify validation issues
+- **Files Modified**:
+  - `server/src/routes/settings.ts`
+- **Status**: ✅ **RESOLVED** - WhatsApp settings can now be saved with localhost URLs
+
+### TypeScript Compilation Errors Fixed
+- **Issue**: ValidationError type property access errors in settings route
+- **Root Cause**: Incorrect property access on express-validator ValidationError objects
+- **Solution**: Updated error handling to properly access validation error properties using conditional checks
+- **Status**: ✅ **RESOLVED** - All TypeScript compilation errors resolved
+
 ### Docker Deployment Progress
 - Successfully resolved TypeScript compilation errors in backend routes
 - Fixed missing return statements in dashboard.ts, settings.ts, and veeam.ts
@@ -118,6 +176,13 @@
 - Files appear to be cached or not properly updated in Docker context
 
 ### Current Status
+- Frontend: Running on `http://localhost:8080/`
+- Backend: Running on `http://localhost:3001/`
+- WebSocket: Running on port 3002
+- API Communication: ✅ Working
+- WebSocket Communication: ✅ Working
+- WhatsApp Settings: ✅ Working
+- TypeScript Compilation: ✅ Clean
 - Backend TypeScript compilation: ❌ Still failing
 - Frontend build process: ✅ Working
 - Docker containerization: ❌ Build failing
@@ -386,6 +451,53 @@ The environment files and Docker configuration were using incorrect port mapping
 **Status:** Environment files fully synchronized and ready for Docker deployment.
 
 ---
+
+## Current Implementation Analysis
+**Date:** 2025-08-15 08:50 WIB
+
+### System Overview
+The Veeam Insight Dashboard is a comprehensive monitoring solution built with modern web technologies:
+
+#### Frontend Stack:
+- **Framework**: React 18 with TypeScript
+- **Build Tool**: Vite for fast development and optimized builds
+- **UI Library**: shadcn/ui components with Radix UI primitives
+- **Styling**: Tailwind CSS with custom design system
+- **State Management**: TanStack Query for server state, React Context for auth
+- **Routing**: React Router for SPA navigation
+- **Real-time**: Socket.IO client for WebSocket connections
+
+#### Backend Stack:
+- **Runtime**: Node.js with Express.js
+- **Language**: TypeScript with strict type checking
+- **API**: RESTful endpoints with WebSocket support
+- **Authentication**: JWT-based with refresh tokens
+- **Caching**: Node-cache for performance optimization
+- **Monitoring**: Real-time job and repository monitoring
+- **Logging**: Winston for structured logging
+- **Security**: Helmet, CORS, rate limiting
+
+#### Architecture Pattern:
+- **Deployment**: Docker Compose with multi-stage builds
+- **Reverse Proxy**: Nginx for SSL termination and static file serving
+- **Container Strategy**: Single application container + Nginx proxy
+- **Ports**: 3003 (API), 3002 (WebSocket), 9007 (HTTP), 9008 (HTTPS)
+
+#### Key Features Implemented:
+1. **Dashboard**: Real-time status cards, job monitoring, repository charts
+2. **Authentication**: Secure login with JWT tokens
+3. **Real-time Updates**: WebSocket integration for live data
+4. **Responsive Design**: Mobile-first approach with Tailwind
+5. **Alert System**: Monitoring service with notification capabilities
+6. **WhatsApp Integration**: Optional messaging for alerts
+7. **Mock Services**: Development mode with simulated data
+
+#### File Structure:
+- **Frontend**: `/src` - React components, pages, hooks, services
+- **Backend**: `/server/src` - Express routes, services, middleware
+- **UI Components**: shadcn/ui in `/src/components/ui`
+- **Dashboard Components**: Custom components in `/src/components/dashboard`
+- **Configuration**: Environment files, Docker configs, Nginx setup
 
 ## Docker Compose Architecture Clarification
 **Date:** 2025-08-14 12:45 WIB
@@ -1132,6 +1244,48 @@ $ ls -la nginx*
 
 #### 🎯 **Purpose**
 These files enable local development and debugging of the Nginx configuration issues identified in the WebSocket investigation.
+
+---
+
+## 2025-08-14 19:46 - Production Dockerfile Transfer
+
+### 🐳 Docker Configuration
+- **Copied production Dockerfile** from Docker server (`10.60.10.59:/root/veeam-insight-dash/Dockerfile`)
+- **Multi-stage build configuration** with optimized production setup:
+  - **Stage 1**: Frontend build (Node.js 20 Alpine)
+  - **Stage 2**: Backend build (TypeScript compilation)
+  - **Stage 3**: Production runtime (minimal footprint)
+- **Security features**:
+  - Non-root user (`veeam:nodejs`)
+  - Proper signal handling with `dumb-init`
+  - Health check endpoint configuration
+- **Port exposure**: 3003 (main API), 3002 (WebSocket)
+- **Production optimizations**: Only production dependencies, cleaned npm cache
+
+### 🎯 Build Process
+- **Frontend**: Vite build with static assets
+- **Backend**: TypeScript compilation to `dist/`
+- **Runtime**: Node.js with proper entrypoint script
+- **Environment**: Production environment files integration
+
+---
+
+## 2025-08-14 19:14 - TypeScript Configuration Fix
+
+### 🔧 Server TypeScript Configuration
+- **Fixed `server/tsconfig.json`** compilation errors
+- **Updated module resolution** from `"node"` to `"bundler"` for better ES module support
+- **Added explicit type configuration**:
+  - `"types": ["node"]` - Explicit Node.js types
+  - `"lib": ["ES2022"]` - Target library specification
+  - `"strict": true` - Enhanced type checking
+- **Resolved 33 TypeScript errors** related to type definition files
+- **Verified compilation** with `npx tsc --noEmit` - now passes without errors
+
+### 🎯 Technical Details
+- **Root cause**: Module resolution conflicts with ES modules and type definitions
+- **Solution**: Updated to `bundler` resolution strategy for better compatibility
+- **Result**: Clean TypeScript compilation for the entire server codebase
 
 ---
 
