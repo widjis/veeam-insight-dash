@@ -1,5 +1,6 @@
 import { PrismaClient } from '../src/generated/prisma';
 import { configService } from '../src/services/configService';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -123,9 +124,14 @@ async function main() {
 
     // Create admin user if it doesn't exist
     console.log('👤 Creating admin user...');
+    const adminPassword = 'admin';
+    const passwordHash = await bcrypt.hash(adminPassword, 10);
+    
     const adminUser = await prisma.user.upsert({
       where: { email: 'admin@company.com' },
-      update: {},
+      update: {
+        passwordHash: passwordHash
+      },
       create: {
         email: 'admin@company.com',
         username: 'admin',
@@ -133,7 +139,7 @@ async function main() {
         lastName: 'Administrator',
         role: 'admin',
         isActive: true,
-        passwordHash: '$2b$10$placeholder_hash_replace_in_production'
+        passwordHash: passwordHash
       }
     });
 

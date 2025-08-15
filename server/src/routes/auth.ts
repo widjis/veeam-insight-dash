@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { PrismaClient } from '../generated/prisma';
 
 import { config } from '@/config/environment.js';
 import { logger } from '@/utils/logger.js';
@@ -14,6 +15,7 @@ import {
 } from '@/types/index.js';
 
 const router = Router();
+const prisma = new PrismaClient();
 
 // Rate limiting for auth endpoints - temporarily disabled due to proxy configuration issues
 // const authLimiter = rateLimit({
@@ -27,38 +29,6 @@ const router = Router();
 //   standardHeaders: true,
 //   legacyHeaders: false,
 // });
-
-// Mock user database (in production, this would be a real database)
-const users: User[] = [
-  {
-    id: '1',
-    username: 'admin',
-    email: 'admin@veeam.local',
-    role: 'admin',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: '2',
-    username: 'operator',
-    email: 'operator@veeam.local',
-    role: 'operator',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: '3',
-    username: 'viewer',
-    email: 'viewer@veeam.local',
-    role: 'viewer',
-    createdAt: new Date().toISOString(),
-  },
-];
-
-// Mock password storage (in production, these would be properly hashed)
-const passwords: Record<string, string> = {
-  admin: '$2b$10$rQZ8kHWKtGY5uFJ5uJ5uJ5uJ5uJ5uJ5uJ5uJ5uJ5uJ5uJ5uJ5uJ5u', // 'admin123'
-  operator: '$2b$10$rQZ8kHWKtGY5uFJ5uJ5uJ5uJ5uJ5uJ5uJ5uJ5uJ5uJ5uJ5uJ5uJ5u', // 'operator123'
-  viewer: '$2b$10$rQZ8kHWKtGY5uFJ5uJ5uJ5uJ5uJ5uJ5uJ5uJ5uJ5uJ5uJ5uJ5uJ5u', // 'viewer123'
-};
 
 // Helper functions
 function generateTokens(user: User): AuthTokens {
@@ -83,23 +53,22 @@ function generateTokens(user: User): AuthTokens {
   };
 }
 
-function findUserByUsername(username: string): User | undefined {
-  return users.find(user => user.username === username);
+async function findUserByUsername(username: string) {
+  const user = await prisma.user.findUnique({
+    where: { username }
+  });
+  return user;
 }
 
-function findUserById(id: string): User | undefined {
-  return users.find(user => user.id === id);
+async function findUserById(id: string) {
+  const user = await prisma.user.findUnique({
+    where: { id }
+  });
+  return user;
 }
 
-async function verifyPassword(username: string, password: string): Promise<boolean> {
-  // Simple admin/admin authentication for development
-  const expectedPasswords: Record<string, string> = {
-    admin: 'admin',
-    operator: 'operator123',
-    viewer: 'viewer123',
-  };
-  
-  return password === expectedPasswords[username];
+async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
+  return bcrypt.compare(password, hashedPassword);
 }
 
 // Routes
@@ -124,8 +93,8 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     // Find user
-    const user = findUserByUsername(username);
-    if (!user) {
+    const dbUser = await findUserByUsername(username);
+    if (!dbUser) {
       const response: ApiResponse = {
         success: false,
         error: 'Invalid credentials',
@@ -135,7 +104,7 @@ router.post('/login', async (req: Request, res: Response) => {
     }
 
     // Verify password
-    const isValidPassword = await verifyPassword(username, password);
+    const isValidPassword = await verifyPassword(password, dbUser.passwordHash);
     if (!isValidPassword) {
       const response: ApiResponse = {
         success: false,
@@ -145,11 +114,24 @@ router.post('/login', async (req: Request, res: Response) => {
       return res.status(401).json(response);
     }
 
+    // Map database user to response format
+    const user: User = {
+      id: dbUser.id,
+      username: dbUser.username,
+      email: dbUser.email,
+      role: dbUser.role as 'admin' | 'operator' | 'viewer',
+      createdAt: dbUser.createdAt.toISOString(),
+      lastLogin: dbUser.lastLoginAt?.toISOString(),
+    };
+
     // Generate tokens
     const tokens = generateTokens(user);
 
     // Update last login
-    user.lastLogin = new Date().toISOString();
+    await prisma.user.update({
+      where: { id: dbUser.id },
+      data: { lastLoginAt: new Date() }
+    });
 
     logger.info(`User logged in: ${username}`);
 
@@ -161,7 +143,7 @@ router.post('/login', async (req: Request, res: Response) => {
           email: user.email,
           role: user.role,
           createdAt: user.createdAt,
-          lastLogin: user.lastLogin,
+          lastLogin: new Date().toISOString(),
         },
         tokens,
       },
@@ -212,8 +194,8 @@ router.post('/refresh', async (req: Request, res: Response) => {
     }
 
     // Find user
-    const user = findUserById(decoded.userId);
-    if (!user) {
+    const dbUser = await findUserById(decoded.userId);
+    if (!dbUser) {
       const response: ApiResponse = {
         success: false,
         error: 'User not found',
@@ -221,6 +203,16 @@ router.post('/refresh', async (req: Request, res: Response) => {
       };
       return res.status(401).json(response);
     }
+
+    // Map database user to response format
+    const user: User = {
+      id: dbUser.id,
+      username: dbUser.username,
+      email: dbUser.email,
+      role: dbUser.role as 'admin' | 'operator' | 'viewer',
+      createdAt: dbUser.createdAt.toISOString(),
+      lastLogin: dbUser.lastLoginAt?.toISOString(),
+    };
 
     // Generate new tokens
     const tokens = generateTokens(user);
@@ -334,12 +326,13 @@ router.get('/users', authMiddleware, async (req: Request, res: Response) => {
       return res.status(403).json(response);
     }
 
-    const usersWithoutIds = users.map(user => ({
+    const dbUsers = await prisma.user.findMany();
+    const usersWithoutIds = dbUsers.map((user: { username: string; email: string; role: string; createdAt: Date; lastLoginAt?: Date | null }) => ({
       username: user.username,
       email: user.email,
-      role: user.role,
-      createdAt: user.createdAt,
-      lastLogin: user.lastLogin,
+      role: user.role as 'admin' | 'operator' | 'viewer',
+      createdAt: user.createdAt.toISOString(),
+      lastLogin: user.lastLoginAt?.toISOString(),
     }));
 
     const response: ApiResponse<Omit<User, 'id'>[]> = {

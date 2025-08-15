@@ -98,13 +98,15 @@ class WebSocketService {
     console.log('WebSocket connecting to:', wsUrl);
     
     this.socket = io(wsUrl, {
-      transports: ['websocket', 'polling'],
-      timeout: 30000,
-      forceNew: true,
+      transports: ['polling', 'websocket'],
+      timeout: 60000,
+      forceNew: false,
       autoConnect: true,
       reconnection: true,
       reconnectionDelay: 1000,
-      reconnectionAttempts: 5
+      reconnectionAttempts: 10,
+      reconnectionDelayMax: 5000,
+      randomizationFactor: 0.5
     });
 
     this.setupEventListeners();

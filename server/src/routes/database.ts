@@ -192,6 +192,10 @@ router.put('/veeam-configs/:id', [
     const updateData = req.body;
 
     const config = await veeamConfigService.updateConfig(id, updateData);
+    
+    // Clear configuration cache to ensure immediate effect
+    configService.clearCache();
+    logger.info('Veeam configuration updated successfully and cache cleared');
 
     // Remove sensitive data
     const sanitizedConfig = {
@@ -328,6 +332,10 @@ router.put('/system-config', [
     const userId = req.user?.id || 'unknown';
 
     await configService.setConfig(category, key, value, description, isSecret, userId);
+    
+    // Clear configuration cache to ensure immediate effect
+    configService.clearCache();
+    logger.info('System configuration updated successfully and cache cleared');
 
     const response: ApiResponse<null> = {
       success: true,

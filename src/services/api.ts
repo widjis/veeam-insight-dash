@@ -193,6 +193,10 @@ class ApiClient {
   }
 
   logout(): void {
+    // Call backend logout endpoint
+    this.axiosInstance.post('/auth/logout').catch(() => {
+      // Ignore errors on logout
+    });
     this.clearTokens();
   }
 
@@ -413,6 +417,157 @@ class ApiClient {
       return {
         success: false,
         error: error.response?.data?.error || 'Failed to send WhatsApp report',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async sendEmailReport(data: {
+    recipients: string[];
+    subject?: string;
+    format: 'summary' | 'detailed';
+    reportType?: 'daily' | 'weekly' | 'monthly';
+    reportFormat?: 'html' | 'pdf' | 'csv';
+  }): Promise<ApiResponse<any>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.post(
+        '/settings/email/send-report',
+        data
+      );
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to send email report',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  // Reports API methods
+  async getReportHistory(): Promise<ApiResponse<any[]>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await this.axiosInstance.get(
+        '/reports/history'
+      );
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to fetch report history',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async generateReport(data: {
+    type: 'summary' | 'detailed';
+    format: 'html' | 'pdf' | 'csv';
+    startDate: string;
+    endDate: string;
+    includeJobs?: boolean;
+    includeRepositories?: boolean;
+    includeAlerts?: boolean;
+  }): Promise<ApiResponse<any>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.post(
+        '/reports/generate',
+        data
+      );
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to generate report',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async previewReport(data: {
+    type: 'summary' | 'detailed';
+    startDate: string;
+    endDate: string;
+    includeJobs?: boolean;
+    includeRepositories?: boolean;
+    includeAlerts?: boolean;
+  }): Promise<ApiResponse<any>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.post(
+        '/reports/preview',
+        data
+      );
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to preview report',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  // Generic HTTP methods for scheduled reports and other endpoints
+  async get<T = any>(url: string): Promise<ApiResponse<T>> {
+    try {
+      const response: AxiosResponse<ApiResponse<T>> = await this.axiosInstance.get(url);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Request failed',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async post<T = any>(url: string, data?: any): Promise<ApiResponse<T>> {
+    try {
+      const response: AxiosResponse<ApiResponse<T>> = await this.axiosInstance.post(url, data);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Request failed',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async put<T = any>(url: string, data?: any): Promise<ApiResponse<T>> {
+    try {
+      const response: AxiosResponse<ApiResponse<T>> = await this.axiosInstance.put(url, data);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Request failed',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async patch<T = any>(url: string, data?: any): Promise<ApiResponse<T>> {
+    try {
+      const response: AxiosResponse<ApiResponse<T>> = await this.axiosInstance.patch(url, data);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Request failed',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async delete<T = any>(url: string): Promise<ApiResponse<T>> {
+    try {
+      const response: AxiosResponse<ApiResponse<T>> = await this.axiosInstance.delete(url);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Request failed',
         timestamp: new Date().toISOString(),
       };
     }

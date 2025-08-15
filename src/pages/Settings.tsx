@@ -37,6 +37,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { apiClient } from "@/services/api"
 import { useAuth } from "@/contexts/AuthContext"
+import ScheduledReports from "@/components/ScheduledReports"
 
 const SettingsSchema = z.object({
   alerts: z.object({
@@ -113,7 +114,7 @@ const DEFAULT_SETTINGS: SettingsValues = {
   },
   whatsapp: {
     enabled: false,
-    apiUrl: "http://10.60.10.59:8192",
+    apiUrl: "",
     apiToken: "",
     chatId: "",
     defaultRecipients: "",
@@ -178,14 +179,21 @@ const Settings = () => {
   // Load saved settings
   useEffect(() => {
     const loadSettings = async () => {
-      // Load from localStorage first
+      // Start with default settings
+      let settings = { ...DEFAULT_SETTINGS }
+      
+      // Load from localStorage (but exclude WhatsApp settings as they come from backend)
       const saved = localStorage.getItem(STORAGE_KEY)
-      let settings = DEFAULT_SETTINGS
       if (saved) {
         try {
-          settings = JSON.parse(saved)
+          const savedSettings = JSON.parse(saved)
+          // Merge all settings except WhatsApp (which comes from backend)
+          settings = {
+            ...savedSettings,
+            whatsapp: settings.whatsapp // Keep default WhatsApp settings
+          }
         } catch (e) {
-          // ignore parse errors
+          console.warn('Failed to parse saved settings from localStorage:', e)
         }
       }
       
@@ -197,7 +205,14 @@ const Settings = () => {
           console.log('WhatsApp settings result:', result)
           if (result.success && result.data) {
             console.log('WhatsApp settings data:', result.data)
-            settings.whatsapp = result.data
+            // Ensure we completely replace WhatsApp settings with backend data
+            settings.whatsapp = {
+              enabled: result.data.enabled ?? false,
+              apiUrl: result.data.apiUrl ?? '',
+              apiToken: result.data.apiToken ?? '',
+              chatId: result.data.chatId ?? '',
+              defaultRecipients: result.data.defaultRecipients ?? ''
+            }
           } else {
             console.error('Failed to load WhatsApp settings:', result.error)
           }
@@ -388,8 +403,14 @@ const Settings = () => {
         throw new Error(result.error || 'Failed to save WhatsApp settings')
       }
       
-      // Save to localStorage for other settings
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(values))
+      // Save to localStorage for other settings (exclude WhatsApp as it's managed by backend)
+      const settingsForLocalStorage = {
+        ...values,
+        whatsapp: undefined // Don't save WhatsApp settings to localStorage
+      }
+      delete settingsForLocalStorage.whatsapp
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsForLocalStorage))
+      
       toast({ title: "Settings saved", description: "Your preferences have been updated." })
     } catch (error) {
       toast({
@@ -428,6 +449,7 @@ const Settings = () => {
             <TabsTrigger value="alerts">Alerts</TabsTrigger>
             <TabsTrigger value="whatsapp">WhatsApp</TabsTrigger>
             <TabsTrigger value="reporting">Reporting</TabsTrigger>
+            <TabsTrigger value="scheduled-reports">Scheduled Reports</TabsTrigger>
             <TabsTrigger value="general">General</TabsTrigger>
             <TabsTrigger value="testing">Testing</TabsTrigger>
           </TabsList>
@@ -1153,6 +1175,11 @@ const Settings = () => {
                     <Button type="submit">Save changes</Button>
                   </CardFooter>
                 </Card>
+              </TabsContent>
+
+              {/* Scheduled Reports */}
+              <TabsContent value="scheduled-reports" className="space-y-6">
+                <ScheduledReports />
               </TabsContent>
 
               {/* Testing */}

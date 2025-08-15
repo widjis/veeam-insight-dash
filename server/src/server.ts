@@ -19,12 +19,15 @@ import authRoutes from '@/routes/auth.js';
 import dashboardRoutes, { setServices } from '@/routes/dashboard.js';
 import settingsRoutes from '@/routes/settings.js';
 import databaseRoutes from '@/routes/database.js';
+import reportsRoutes, { setReportServices } from '@/routes/reports.js';
+import scheduledReportsRoutes, { setScheduledReportService } from '@/routes/scheduled-reports.js';
 import { VeeamService } from '@/services/VeeamService.js';
 import { MockVeeamService } from '@/services/MockVeeamService.js';
 import { WebSocketService } from '@/services/WebSocketService.js';
 import { CacheService } from '@/services/CacheService.js';
 import { AlertService } from '@/services/AlertService.js';
 import { MonitoringService } from '@/services/MonitoringService.js';
+import { ScheduledReportService } from '@/services/ScheduledReportService.js';
 import { initializeDatabase, checkDatabaseHealth } from '@/services/database.js';
 
 // Get current directory in ES module
@@ -111,6 +114,8 @@ app.use('/api/veeam', authMiddleware, veeamRoutes);
 app.use('/api/dashboard', authMiddleware, dashboardRoutes);
 app.use('/api/settings', authMiddleware, settingsRoutes);
 app.use('/api/database', databaseRoutes);
+app.use('/api/reports', authMiddleware, reportsRoutes);
+app.use('/api/scheduled-reports', authMiddleware, scheduledReportsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -136,9 +141,16 @@ const wsService = new WebSocketService(server);
 const cacheService = new CacheService();
 const alertService = new AlertService(wsService, cacheService);
 const monitoringService = new MonitoringService(veeamService, wsService, cacheService, alertService);
+const scheduledReportService = new ScheduledReportService(alertService);
 
 // Set services for dashboard routes
 setServices(alertService, monitoringService);
+
+// Set services for reports routes
+setReportServices(veeamService, monitoringService);
+
+// Set services for scheduled reports routes
+setScheduledReportService(scheduledReportService);
 
 // Initialize database connection
 try {
@@ -167,6 +179,9 @@ process.on('SIGTERM', async () => {
     // Stop monitoring service
     await monitoringService.stop();
     
+    // Stop scheduled report service
+    scheduledReportService.stop();
+    
     process.exit(0);
   });
 });
@@ -183,6 +198,9 @@ process.on('SIGINT', async () => {
     // Stop monitoring service
     await monitoringService.stop();
     
+    // Stop scheduled report service
+    scheduledReportService.stop();
+    
     process.exit(0);
   });
 });
@@ -195,6 +213,9 @@ server.listen(config.port, () => {
   
   // Initialize monitoring
   monitoringService.start();
+  
+  // Initialize scheduled reports
+  scheduledReportService.start();
   
   logger.info('✅ Veeam Insight Dashboard Backend Started Successfully');
 });

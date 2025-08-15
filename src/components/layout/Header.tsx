@@ -1,4 +1,4 @@
-import { Settings, User, RefreshCw } from "lucide-react";
+import { Settings, User, RefreshCw, LogOut, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -8,10 +8,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import AlertNotifications from './AlertNotifications';
+import { useAuth } from '@/contexts/AuthContext';
 
 export const Header = () => {
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = () => {
+    logout();
+    navigate('/login');
+  };
+
   return (
     <header className="bg-card border-b border-dashboard-border shadow-soft">
       <div className="flex items-center justify-between px-6 py-4">
@@ -50,11 +59,18 @@ export const Header = () => {
                   Settings
                 </Link>
               </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link to="/reports" className="flex items-center">
+                  <FileText className="mr-2 h-4 w-4" />
+                  Reports
+                </Link>
+              </DropdownMenuItem>
               <DropdownMenuItem>
                 Profile
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer">
+                <LogOut className="mr-2 h-4 w-4" />
                 Sign out
               </DropdownMenuItem>
             </DropdownMenuContent>
