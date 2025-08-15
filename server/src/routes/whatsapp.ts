@@ -185,7 +185,7 @@ router.delete('/config/:id', async (req, res) => {
 // POST /api/whatsapp/send-report - Send report via WhatsApp
 router.post('/send-report', async (req, res) => {
   try {
-    const { recipients, reportData, useImageReport } = req.body
+    const { recipients, reportData, useImageReport, format = 'summary' } = req.body
     
     // Validate required parameters
     if (!recipients || !Array.isArray(recipients) || recipients.length === 0) {
@@ -343,7 +343,7 @@ router.post('/send-report', async (req, res) => {
     }
     
     // Format the report message with advanced analytics
-    const formatReportMessage = (data: any): string => {
+    const formatReportMessage = (data: any, format: string = 'summary'): string => {
       const summary = data.summary || {}
       const analytics = calculateAdvancedAnalytics(data)
       const dateRange = `${data.dateRange?.startDate || 'N/A'} to ${data.dateRange?.endDate || 'N/A'}`
@@ -359,103 +359,126 @@ router.post('/send-report', async (req, res) => {
       }
       
       let message = `${reportIcon} *Veeam Backup Report*\n\n` +
-                   `📅 Period: ${dateRange}\n\n` +
-                   `📊 *Performance Summary:*\n` +
+                   `📅 Period: ${dateRange}\n\n`
+      
+      if (format === 'summary') {
+        // Summary format - brief overview
+        message += `📊 *Summary:*\n` +
+                  `• Total Jobs: ${summary.totalJobs || 0}\n` +
+                  `• ✅ Successful: ${summary.successfulJobs || 0}\n` +
+                  `• ❌ Failed: ${summary.failedJobs || 0}\n` +
+                  `• ⚠️ Warnings: ${summary.warningJobs || 0}\n\n`
+        
+        // Basic storage info for summary
+        message += `💾 *Storage:*\n` +
+                  `• Total Capacity: ${analytics.totalCapacity}TB\n` +
+                  `• Used: ${analytics.totalUsed}TB (${analytics.overallUsage}%)\n\n`
+        
+        // Only show critical issues in summary
+        if (analytics.recentFailures > 0) {
+          message += `🚨 *Critical Issues:*\n` +
+                    `• ${analytics.recentFailures} failed job(s) need attention\n\n`
+        }
+        
+      } else {
+         // Detailed format - comprehensive analytics
+         message += `📊 *Performance Summary:*\n` +
                    `• Total Jobs: ${summary.totalJobs || 0}\n` +
                    `• ✅ Success Rate: ${analytics.successRate}%\n` +
                    `• ❌ Failure Rate: ${analytics.failureRate}%\n` +
                    `• ⚠️ Warning Rate: ${analytics.warningRate}%\n` +
                    `• 🚨 Active Alerts: ${summary.totalAlerts || 0}\n\n` +
                    `🏥 *System Health Score: ${analytics.healthScore}/100*\n\n`
-      
-      // Add storage analytics
-      message += `💾 *Storage Analytics:*\n` +
-                `• Total Capacity: ${analytics.totalCapacity}TB\n` +
-                `• Total Used: ${analytics.totalUsed}TB\n` +
-                `• Overall Usage: ${analytics.overallUsage}%\n\n`
-      
-      // Add repository health breakdown
-      if (data.repositories && data.repositories.length > 0) {
-        message += `🗄️ *Repository Health:*\n` +
-                  `• 🟢 Healthy: ${analytics.healthyRepos} repos (≤70%)\n` +
-                  `• 🟡 Warning: ${analytics.warningRepos} repos (70-85%)\n` +
-                  `• 🔴 Critical: ${analytics.criticalRepos} repos (>85%)\n\n`
         
-        // Show top repositories by usage
-        const topRepos = data.repositories
-          .sort((a: any, b: any) => (b.usagePercent || 0) - (a.usagePercent || 0))
-          .slice(0, 3)
+        // Add storage analytics
+         message += `💾 *Storage Analytics:*\n` +
+                   `• Total Capacity: ${analytics.totalCapacity}TB\n` +
+                   `• Total Used: ${analytics.totalUsed}TB\n` +
+                   `• Overall Usage: ${analytics.overallUsage}%\n\n`
         
-        if (topRepos.length > 0) {
-          message += `📊 *Top Repository Usage:*\n`
-          topRepos.forEach((repo: any) => {
-            const capacityTB = repo.capacity ? repo.capacity.toFixed(2) : '0.00'
-            const usedTB = repo.used ? repo.used.toFixed(2) : '0.00'
-            const usagePercent = repo.usagePercent ? repo.usagePercent.toFixed(2) : '0.00'
-            const statusIcon = parseFloat(usagePercent) > 85 ? '🔴' : parseFloat(usagePercent) > 70 ? '🟡' : '🟢'
+        // Add repository health breakdown
+         if (data.repositories && data.repositories.length > 0) {
+          message += `🗄️ *Repository Health:*\n` +
+                    `• 🟢 Healthy: ${analytics.healthyRepos} repos (≤70%)\n` +
+                    `• 🟡 Warning: ${analytics.warningRepos} repos (70-85%)\n` +
+                    `• 🔴 Critical: ${analytics.criticalRepos} repos (>85%)\n\n`
+          
+          // Show top repositories by usage
+          const topRepos = data.repositories
+            .sort((a: any, b: any) => (b.usagePercent || 0) - (a.usagePercent || 0))
+            .slice(0, 3)
+          
+          if (topRepos.length > 0) {
+            message += `📊 *Top Repository Usage:*\n`
+            topRepos.forEach((repo: any) => {
+              const capacityTB = repo.capacity ? repo.capacity.toFixed(2) : '0.00'
+              const usedTB = repo.used ? repo.used.toFixed(2) : '0.00'
+              const usagePercent = repo.usagePercent ? repo.usagePercent.toFixed(2) : '0.00'
+              const statusIcon = parseFloat(usagePercent) > 85 ? '🔴' : parseFloat(usagePercent) > 70 ? '🟡' : '🟢'
+              
+              message += `• ${statusIcon} ${repo.name || 'Unknown'}: ${usedTB}TB / ${capacityTB}TB (${usagePercent}%)\n`
+            })
+            message += `\n`
+          }
+        }
+        
+        // Add performance trends and critical issues
+        if (analytics.recentFailures > 0 || analytics.recentWarnings > 0) {
+          message += `⚠️ *Performance Trends:*\n`
+          
+          if (analytics.recentFailures > 0) {
+            const failedJobs = data.jobs.filter((job: any) => job.result === 'Failed' || job.lastResult === 'Failed')
+            message += `• 🔴 Recent Failures: ${analytics.recentFailures}\n`
             
-            message += `• ${statusIcon} ${repo.name || 'Unknown'}: ${usedTB}TB / ${capacityTB}TB (${usagePercent}%)\n`
-          })
+            // Show top 3 failed jobs with details
+            const topFailedJobs = failedJobs.slice(0, 3)
+            topFailedJobs.forEach((job: any) => {
+              const jobType = job.type || 'Backup'
+              const duration = job.duration || 'Unknown'
+              message += `  - ${job.name || 'Unknown Job'} (${jobType})\n`
+              if (job.message) {
+                message += `    Error: ${job.message.substring(0, 50)}${job.message.length > 50 ? '...' : ''}\n`
+              }
+            })
+          }
+          
+          if (analytics.recentWarnings > 0) {
+            const warningJobs = data.jobs.filter((job: any) => job.result === 'Warning' || job.lastResult === 'Warning')
+            message += `• 🟡 Recent Warnings: ${analytics.recentWarnings}\n`
+            
+            // Show top 3 warning jobs with details
+            const topWarningJobs = warningJobs.slice(0, 3)
+            topWarningJobs.forEach((job: any) => {
+              const jobType = job.type || 'Backup'
+              const duration = job.duration || 'Unknown'
+              message += `  - ${job.name || 'Unknown Job'} (${jobType})\n`
+              if (job.message) {
+                message += `    Warning: ${job.message.substring(0, 50)}${job.message.length > 50 ? '...' : ''}\n`
+              }
+            })
+          }
+          
           message += `\n`
         }
-      }
-      
-      // Add performance trends and critical issues
-      if (analytics.recentFailures > 0 || analytics.recentWarnings > 0) {
-        message += `⚠️ *Performance Trends:*\n`
         
-        if (analytics.recentFailures > 0) {
-          const failedJobs = data.jobs.filter((job: any) => job.result === 'Failed' || job.lastResult === 'Failed')
-          message += `• 🔴 Recent Failures: ${analytics.recentFailures}\n`
+        // Add system recommendations based on health score
+        if (parseFloat(analytics.healthScore) < 80) {
+          message += `💡 *Recommendations:*\n`
           
-          // Show top 3 failed jobs with details
-          const topFailedJobs = failedJobs.slice(0, 3)
-          topFailedJobs.forEach((job: any) => {
-            const jobType = job.type || 'Backup'
-            const duration = job.duration || 'Unknown'
-            message += `  - ${job.name || 'Unknown Job'} (${jobType})\n`
-            if (job.message) {
-              message += `    Error: ${job.message.substring(0, 50)}${job.message.length > 50 ? '...' : ''}\n`
-            }
-          })
-        }
-        
-        if (analytics.recentWarnings > 0) {
-          const warningJobs = data.jobs.filter((job: any) => job.result === 'Warning' || job.lastResult === 'Warning')
-          message += `• 🟡 Recent Warnings: ${analytics.recentWarnings}\n`
+          if (analytics.criticalRepos > 0) {
+            message += `• 🔴 ${analytics.criticalRepos} repository(ies) need immediate attention (>85% full)\n`
+          }
           
-          // Show top 3 warning jobs with details
-          const topWarningJobs = warningJobs.slice(0, 3)
-          topWarningJobs.forEach((job: any) => {
-            const jobType = job.type || 'Backup'
-            const duration = job.duration || 'Unknown'
-            message += `  - ${job.name || 'Unknown Job'} (${jobType})\n`
-            if (job.message) {
-              message += `    Warning: ${job.message.substring(0, 50)}${job.message.length > 50 ? '...' : ''}\n`
-            }
-          })
+          if (parseFloat(analytics.failureRate) > 10) {
+            message += `• 🚨 High failure rate detected - review backup configurations\n`
+          }
+          
+          if (parseFloat(analytics.overallUsage) > 80) {
+            message += `• 💾 Consider expanding storage capacity (${analytics.overallUsage}% used)\n`
+          }
+          
+          message += `\n`
         }
-        
-        message += `\n`
-      }
-      
-      // Add system recommendations based on health score
-      if (parseFloat(analytics.healthScore) < 80) {
-        message += `💡 *Recommendations:*\n`
-        
-        if (analytics.criticalRepos > 0) {
-          message += `• 🔴 ${analytics.criticalRepos} repository(ies) need immediate attention (>85% full)\n`
-        }
-        
-        if (parseFloat(analytics.failureRate) > 10) {
-          message += `• 🚨 High failure rate detected - review backup configurations\n`
-        }
-        
-        if (parseFloat(analytics.overallUsage) > 80) {
-          message += `• 💾 Consider expanding storage capacity (${analytics.overallUsage}% used)\n`
-        }
-        
-        message += `\n`
       }
       
       message += `Generated: ${new Date().toLocaleString()}`
@@ -483,7 +506,7 @@ router.post('/send-report', async (req, res) => {
     
     // Send WhatsApp messages to recipients
     const results = []
-    const reportMessage = formatReportMessage(normalizedReportData)
+    const reportMessage = formatReportMessage(normalizedReportData, format)
     
     for (const recipient of recipients) {
       // Declare payload and tempImagePath outside try-catch for cleanup access

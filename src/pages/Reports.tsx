@@ -1,7 +1,7 @@
 import * as React from "react"
 import { useState, useEffect } from "react"
 import { format } from "date-fns"
-import { CalendarIcon, Download, FileText, Mail, MessageSquare, RefreshCw, Eye } from "lucide-react"
+import { Download, FileText, Mail, MessageSquare, RefreshCw, Eye } from "lucide-react"
 import { Header } from "@/components/layout/Header"
 import { Button } from "@/components/ui/button"
 import {
@@ -32,12 +32,7 @@ import {
 } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Calendar } from "@/components/ui/calendar"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
+import { DateTimeSelector } from "@/components/ui/DateTimeSelector"
 import {
   Dialog,
   DialogContent,
@@ -644,57 +639,14 @@ const Reports = () => {
 
                     {selectedReportType === 'custom' && (
                       <>
-                        <div className="space-y-2">
-                          <Label>From Date</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full justify-start text-left font-normal",
-                                  !dateRange.from && "text-muted-foreground"
-                                )}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {dateRange.from ? format(dateRange.from, "PPP") : "Pick a date"}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                              <Calendar
-                                mode="single"
-                                selected={dateRange.from}
-                                onSelect={(date) => setDateRange(prev => ({ ...prev, from: date }))}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>To Date</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className={cn(
-                                  "w-full justify-start text-left font-normal",
-                                  !dateRange.to && "text-muted-foreground"
-                                )}
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {dateRange.to ? format(dateRange.to, "PPP") : "Pick a date"}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0">
-                              <Calendar
-                                mode="single"
-                                selected={dateRange.to}
-                                onSelect={(date) => setDateRange(prev => ({ ...prev, to: date }))}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
+                        <DateTimeSelector
+                          showDateRange={true}
+                          dateFrom={dateRange.from}
+                          dateTo={dateRange.to}
+                          onDateFromChange={(date) => setDateRange(prev => ({ ...prev, from: date }))}
+                          onDateToChange={(date) => setDateRange(prev => ({ ...prev, to: date }))}
+                          layout="grid"
+                        />
                       </>
                     )}
                   </div>

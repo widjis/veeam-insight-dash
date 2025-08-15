@@ -1,6 +1,3 @@
-// Veeam Insight Dashboard - Database Schema
-// PostgreSQL database schema for storing configurations and system data
-
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
@@ -11,293 +8,164 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============================================================================
-// VEEAM CONFIGURATION MODELS
-// ============================================================================
-
-// Main Veeam server configuration
 model VeeamConfig {
-  id              String   @id @default(cuid())
-  name            String   @unique // Friendly name for this configuration
-  baseUrl         String   // Veeam server URL
-  apiVersion      String   @default("1.1-rev1")
-  username        String   // Veeam username
-  password        String   // Encrypted password
-  verifySSL       Boolean  @default(false)
-  isActive        Boolean  @default(true)
-  isDefault       Boolean  @default(false) // Only one can be default
-  description     String?
-  tags            String[] // For categorization
-  
-  // Connection settings
-  timeout         Int      @default(30000) // Connection timeout in ms
-  retryAttempts   Int      @default(3)
-  retryDelay      Int      @default(5000) // Retry delay in ms
-  
-  // Monitoring settings
-  monitoringEnabled Boolean @default(true)
-  alertsEnabled     Boolean @default(true)
-  
-  // Metadata
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  createdBy       String?  // User who created this config
-  lastUsed        DateTime?
-  
-  // Relations
-  alertRules      AlertRule[]
-  auditLogs       AuditLog[]
-  
+  id                String      @id @default(cuid())
+  name              String      @unique
+  baseUrl           String
+  apiVersion        String      @default("1.1-rev1")
+  username          String
+  password          String
+  verifySSL         Boolean     @default(false)
+  isActive          Boolean     @default(true)
+  isDefault         Boolean     @default(false)
+  description       String?
+  tags              String[]
+  timeout           Int         @default(30000)
+  retryAttempts     Int         @default(3)
+  retryDelay        Int         @default(5000)
+  monitoringEnabled Boolean     @default(true)
+  alertsEnabled     Boolean     @default(true)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  createdBy         String?
+  lastUsed          DateTime?
+  alertRules        AlertRule[]
+  auditLogs         AuditLog[]
+
   @@map("veeam_configs")
 }
 
-// ============================================================================
-// ALERT AND NOTIFICATION MODELS
-// ============================================================================
-
-// Alert rules configuration
 model AlertRule {
-  id              String   @id @default(cuid())
-  name            String
-  description     String?
-  ruleType        AlertType
-  severity        AlertSeverity
-  isEnabled       Boolean  @default(true)
-  
-  // Rule conditions (JSON)
-  conditions      Json     // Flexible conditions storage
-  
-  // Notification settings
-  notifyEmail     Boolean  @default(false)
-  notifyWhatsApp  Boolean  @default(false)
-  notifyWebhook   Boolean  @default(false)
-  
-  // Email settings
-  emailRecipients String[] // Array of email addresses
-  
-  // WhatsApp settings
-  whatsappRecipients String[] // Array of phone numbers
-  
-  // Webhook settings
-  webhookUrl      String?
-  webhookHeaders  Json?    // Custom headers for webhook
-  
-  // Timing settings
-  cooldownMinutes Int      @default(60) // Minimum time between alerts
-  
-  // Metadata
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  createdBy       String?
-  
-  // Relations
-  veeamConfigId   String?
-  veeamConfig     VeeamConfig? @relation(fields: [veeamConfigId], references: [id], onDelete: SetNull)
-  alerts          Alert[]
-  
+  id                 String        @id @default(cuid())
+  name               String
+  description        String?
+  ruleType           AlertType
+  severity           AlertSeverity
+  isEnabled          Boolean       @default(true)
+  conditions         Json
+  notifyEmail        Boolean       @default(false)
+  notifyWhatsApp     Boolean       @default(false)
+  notifyWebhook      Boolean       @default(false)
+  emailRecipients    String[]
+  whatsappRecipients String[]
+  webhookUrl         String?
+  webhookHeaders     Json?
+  cooldownMinutes    Int           @default(60)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  createdBy          String?
+  veeamConfigId      String?
+  veeamConfig        VeeamConfig?  @relation(fields: [veeamConfigId], references: [id])
+  alerts             Alert[]
+
   @@map("alert_rules")
 }
 
-// Alert instances
 model Alert {
-  id              String   @id @default(cuid())
-  ruleId          String
-  alertRule       AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
-  
-  title           String
-  message         String
-  severity        AlertSeverity
-  alertType       AlertType
-  
-  // Alert status
-  status          AlertStatus @default(ACTIVE)
-  acknowledgedAt  DateTime?
-  acknowledgedBy  String?
-  resolvedAt      DateTime?
-  resolvedBy      String?
-  
-  // Alert data (JSON)
-  metadata        Json?    // Additional alert data
-  
-  // Notification tracking
-  emailSent       Boolean  @default(false)
-  whatsappSent    Boolean  @default(false)
-  webhookSent     Boolean  @default(false)
-  
-  // Metadata
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
+  id             String        @id @default(cuid())
+  ruleId         String
+  title          String
+  message        String
+  severity       AlertSeverity
+  alertType      AlertType
+  status         AlertStatus   @default(ACTIVE)
+  acknowledgedAt DateTime?
+  acknowledgedBy String?
+  resolvedAt     DateTime?
+  resolvedBy     String?
+  metadata       Json?
+  emailSent      Boolean       @default(false)
+  whatsappSent   Boolean       @default(false)
+  webhookSent    Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  alertRule      AlertRule     @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
   @@map("alerts")
 }
 
-// ============================================================================
-// USER AND SYSTEM CONFIGURATION MODELS
-// ============================================================================
-
-// User authentication and management
 model User {
-  id              String   @id @default(cuid())
-  email           String   @unique
-  username        String   @unique
-  firstName       String
-  lastName        String
-  passwordHash    String
-  role            String   @default("user") // admin, user, viewer
-  isActive        Boolean  @default(true)
-  lastLoginAt     DateTime?
-  
-  // Metadata
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
+  id           String    @id @default(cuid())
+  email        String    @unique
+  username     String    @unique
+  firstName    String
+  lastName     String
+  passwordHash String
+  role         String    @default("user")
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
   @@map("users")
 }
 
-// User settings and preferences
 model UserSetting {
-  id              String   @id @default(cuid())
-  userId          String   // User identifier (from JWT or auth system)
-  category        String   // Settings category (dashboard, notifications, etc.)
-  key             String   // Setting key
-  value           Json     // Setting value (flexible JSON)
-  
-  // Metadata
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
+  id        String   @id @default(cuid())
+  userId    String
+  category  String
+  key       String
+  value     Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@unique([userId, category, key])
   @@map("user_settings")
 }
 
-// System-wide configuration
 model SystemConfig {
-  id              String   @id @default(cuid())
-  category        String   // Config category
-  key             String   // Config key
-  value           Json     // Config value
-  description     String?
-  isSecret        Boolean  @default(false) // Whether this is sensitive data
-  
-  // Metadata
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  updatedBy       String?
-  
+  id          String   @id @default(cuid())
+  category    String
+  key         String
+  value       Json
+  description String?
+  isSecret    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
+
   @@unique([category, key])
   @@map("system_configs")
 }
 
-// ============================================================================
-// WHATSAPP CONFIGURATION MODELS
-// ============================================================================
-
-// WhatsApp configuration and settings
 model WhatsAppConfig {
-  id                    String   @id @default(cuid())
-  name                  String   @unique // Configuration name
-  isActive              Boolean  @default(true)
-  
-  // WhatsApp API settings
-  apiUrl                String?  // WhatsApp Business API URL
-  accessToken           String?  // API access token
-  phoneNumberId         String?  // WhatsApp Business phone number ID
-  
-  // Report settings
-  enableImageReports    Boolean  @default(false)
-  comprehensiveImageReport Boolean @default(false) // New feature for HTML capture
-  imageQuality          String   @default("high") // low, medium, high
-  maxImageWidth         Int      @default(1200)
-  maxImageHeight        Int      @default(800)
-  
-  // Default recipients
-  defaultRecipients     String[] // Array of phone numbers
-  
-  // Message templates
-  reportMessageTemplate String?  // Template for report messages
-  alertMessageTemplate  String?  // Template for alert messages
-  
-  // Metadata
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-  createdBy             String?
-  
+  id                         Int      @id @default(autoincrement())
+  is_active                  Boolean  @default(false)
+  api_url                    String
+  api_token                  String
+  chat_id                    String?
+  default_recipients         String?
+  enable_image_reports       Boolean  @default(false)
+  comprehensive_image_report Boolean  @default(false)
+  image_width                Int?     @default(1200)
+  image_height               Int?     @default(800)
+  image_quality              Int?     @default(80)
+  message_template_summary   String?
+  message_template_detailed  String?
+  created_at                 DateTime @default(now())
+  updated_at                 DateTime @default(now())
+
   @@map("whatsapp_configs")
 }
 
-// ============================================================================
-// REPORT MANAGEMENT MODELS
-// ============================================================================
-
-// Generated reports history
-model ReportHistory {
-  id              String   @id @default(cuid())
-  name            String   // Report display name
-  type            ReportType // Report type
-  format          ReportFormat // Output format
-  
-  // Report metadata
-  generatedAt     DateTime @default(now())
-  fileSize        String?  // Human readable file size (e.g., "2.4 MB")
-  fileSizeBytes   Int?     // Actual file size in bytes
-  status          ReportStatus @default(GENERATING)
-  
-  // Report parameters
-  startDate       DateTime? // Report period start
-  endDate         DateTime? // Report period end
-  includeJobs     Boolean  @default(true)
-  includeRepositories Boolean @default(true)
-  includeAlerts   Boolean  @default(true)
-  
-  // File storage
-  filePath        String?  // Path to generated file
-  downloadUrl     String?  // URL for downloading
-  
-  // User context
-  generatedBy     String?  // User ID who generated the report
-  
-  // Metadata
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  @@map("report_history")
-}
-
-// ============================================================================
-// AUDIT AND LOGGING MODELS
-// ============================================================================
-
-// Audit log for tracking changes
 model AuditLog {
-  id              String   @id @default(cuid())
-  entityType      String   // Type of entity (VeeamConfig, AlertRule, etc.)
-  entityId        String   // ID of the entity
-  action          AuditAction
-  
-  // Change details
-  oldValues       Json?    // Previous values
-  newValues       Json?    // New values
-  changes         String[] // List of changed fields
-  
-  // User context
-  userId          String?
-  userEmail       String?
-  ipAddress       String?
-  userAgent       String?
-  
-  // Metadata
-  createdAt       DateTime @default(now())
-  
-  // Relations
-  veeamConfigId   String?
-  veeamConfig     VeeamConfig? @relation(fields: [veeamConfigId], references: [id], onDelete: SetNull)
-  
+  id            String       @id @default(cuid())
+  entityType    String
+  entityId      String
+  action        AuditAction
+  oldValues     Json?
+  newValues     Json?
+  changes       String[]
+  userId        String?
+  userEmail     String?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime     @default(now())
+  veeamConfigId String?
+  veeamConfig   VeeamConfig? @relation(fields: [veeamConfigId], references: [id])
+
   @@map("audit_logs")
 }
-
-// ============================================================================
-// ENUMS
-// ============================================================================
 
 enum AlertType {
   JOB_FAILED
@@ -307,7 +175,7 @@ enum AlertType {
   SERVER_OFFLINE
   BACKUP_OVERDUE
   CUSTOM
-  
+
   @@map("alert_type")
 }
 
@@ -316,7 +184,7 @@ enum AlertSeverity {
   MEDIUM
   HIGH
   CRITICAL
-  
+
   @@map("alert_severity")
 }
 
@@ -325,36 +193,8 @@ enum AlertStatus {
   ACKNOWLEDGED
   RESOLVED
   SUPPRESSED
-  
+
   @@map("alert_status")
-}
-
-enum ReportType {
-  BACKUP_SUMMARY
-  JOB_PERFORMANCE
-  REPOSITORY_USAGE
-  ALERT_SUMMARY
-  CUSTOM
-  
-  @@map("report_type")
-}
-
-enum ReportFormat {
-  PDF
-  EXCEL
-  CSV
-  JSON
-  
-  @@map("report_format")
-}
-
-enum ReportStatus {
-  GENERATING
-  COMPLETED
-  FAILED
-  CANCELLED
-  
-  @@map("report_status")
 }
 
 enum AuditAction {
@@ -366,6 +206,60 @@ enum AuditAction {
   CONFIG_CHANGE
   ALERT_ACKNOWLEDGE
   ALERT_RESOLVE
-  
+
   @@map("audit_action")
+}
+
+enum ReportConfigType {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum WhatsAppReportFormat {
+  SUMMARY
+  DETAILED
+}
+
+enum ReportFormat {
+  HTML
+  PDF
+  CSV
+  JSON
+}
+
+// Report configuration for automated scheduling
+model ReportConfig {
+  id              String   @id @default(cuid())
+  name            String   // Configuration name (e.g., "Daily Summary", "Weekly Trend")
+  type            ReportConfigType // daily, weekly, monthly
+  enabled         Boolean  @default(false)
+  
+  // Schedule settings
+  deliveryTime    String   // Time to send (e.g., "09:00")
+  timezone        String   @default("UTC")
+  
+  // Email delivery settings
+  emailEnabled    Boolean  @default(false)
+  emailRecipients String[] // Array of email addresses
+  emailFormat     ReportFormat @default(HTML)
+  
+  // WhatsApp delivery settings
+  whatsappEnabled Boolean  @default(false)
+  whatsappRecipients String[] // Array of phone numbers
+  whatsappFormat  WhatsAppReportFormat @default(SUMMARY)
+  
+  // Report content settings
+  includeJobs     Boolean  @default(true)
+  includeRepositories Boolean @default(true)
+  includeAlerts   Boolean  @default(true)
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       String?
+  lastRun         DateTime?
+  nextRun         DateTime?
+  
+  @@map("report_configs")
 }

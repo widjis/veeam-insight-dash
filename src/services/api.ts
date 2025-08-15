@@ -711,6 +711,108 @@ class ApiClient {
       };
     }
   }
+
+  // Report Configuration API methods
+  async getReportConfigs(): Promise<ApiResponse<any[]>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await this.axiosInstance.get('/report-configs');
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to fetch report configurations',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async getEnabledReportConfigs(): Promise<ApiResponse<any[]>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any[]>> = await this.axiosInstance.get('/report-configs/enabled');
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to fetch enabled report configurations',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async createReportConfig(config: {
+    name: string;
+    type: 'DAILY_SUMMARY' | 'WEEKLY_TREND' | 'MONTHLY_CAPACITY';
+    enabled: boolean;
+    deliveryTime: string;
+    timezone: string;
+    emailRecipients?: string;
+    reportFormat?: 'HTML' | 'PDF' | 'CSV';
+    whatsappEnabled?: boolean;
+    whatsappRecipients?: string;
+    whatsappFormat?: 'SUMMARY' | 'DETAILED';
+    whatsappImageReport?: boolean;
+  }): Promise<ApiResponse<any>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.post('/report-configs', config);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to create report configuration',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async updateReportConfig(id: string, config: {
+    name?: string;
+    enabled?: boolean;
+    deliveryTime?: string;
+    timezone?: string;
+    emailRecipients?: string;
+    reportFormat?: 'HTML' | 'PDF' | 'CSV';
+    whatsappEnabled?: boolean;
+    whatsappRecipients?: string;
+    whatsappFormat?: 'SUMMARY' | 'DETAILED';
+    whatsappImageReport?: boolean;
+  }): Promise<ApiResponse<any>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.put(`/report-configs/${id}`, config);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to update report configuration',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async deleteReportConfig(id: string): Promise<ApiResponse<any>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.delete(`/report-configs/${id}`);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to delete report configuration',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async toggleReportConfig(id: string): Promise<ApiResponse<any>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.patch(`/report-configs/${id}/toggle`);
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || error.message || 'Failed to toggle report configuration',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
 }
 
 // Create and export a singleton instance

@@ -71,7 +71,7 @@ The application configuration has been updated to use the new credentials:
 
 **Environment Variables:**
 ```env
-DATABASE_URL=postgresql://veeam_insight:VeeamInsight2025!@10.60.10.59:5432/veeam_insight_db
+DATABASE_URL=postgresql://vaultuser:VaultP@ssw0rd!@10.60.10.59:5432/veeam_insight_db
 ```
 
 **Files Updated:**
@@ -83,12 +83,12 @@ DATABASE_URL=postgresql://veeam_insight:VeeamInsight2025!@10.60.10.59:5432/veeam
 1. **Test Prisma connection:**
    ```bash
    cd server
-   DATABASE_URL='postgresql://veeam_insight:VeeamInsight2025!@10.60.10.59:5432/veeam_insight_db' npx prisma db push
+   DATABASE_URL='postgresql://vaultuser:VaultP@ssw0rd!@10.60.10.59:5432/veeam_insight_db' npx prisma db push
    ```
 
 2. **Verify with Prisma Studio:**
    ```bash
-   DATABASE_URL='postgresql://veeam_insight:VeeamInsight2025!@10.60.10.59:5432/veeam_insight_db' npx prisma studio
+   DATABASE_URL='postgresql://vaultuser:VaultP@ssw0rd!@10.60.10.59:5432/veeam_insight_db' npx prisma studio
    ```
 
 ## Security Benefits

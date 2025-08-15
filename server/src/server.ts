@@ -21,6 +21,7 @@ import settingsRoutes from '@/routes/settings.js';
 import databaseRoutes from '@/routes/database.js';
 import reportsRoutes, { setReportServices } from '@/routes/reports.js';
 import scheduledReportsRoutes, { setScheduledReportService } from '@/routes/scheduled-reports.js';
+import reportConfigsRoutes from '@/routes/report-configs.js';
 import whatsappRoutes from '@/routes/whatsapp.js';
 import { VeeamService } from '@/services/VeeamService.js';
 import { MockVeeamService } from '@/services/MockVeeamService.js';
@@ -117,6 +118,7 @@ app.use('/api/settings', authMiddleware, settingsRoutes);
 app.use('/api/database', databaseRoutes);
 app.use('/api/reports', authMiddleware, reportsRoutes);
 app.use('/api/scheduled-reports', authMiddleware, scheduledReportsRoutes);
+app.use('/api/report-configs', authMiddleware, reportConfigsRoutes);
 app.use('/api/whatsapp', authMiddleware, whatsappRoutes);
 
 // 404 handler
@@ -160,6 +162,14 @@ try {
   const dbHealthy = await checkDatabaseHealth();
   if (dbHealthy) {
     logger.info('Database connection established successfully');
+    
+    // Start scheduled report service after database is ready
+    try {
+      await scheduledReportService.start();
+      logger.info('Scheduled report service started successfully');
+    } catch (schedulerError) {
+      logger.error('Failed to start scheduled report service:', schedulerError);
+    }
   } else {
     logger.warn('Database health check failed');
   }

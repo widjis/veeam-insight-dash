@@ -153,6 +153,8 @@ const Settings = () => {
   const { isAuthenticated } = useAuth()
   const [previewModalOpen, setPreviewModalOpen] = useState(false)
   const [previewContent, setPreviewContent] = useState<string>('')
+  const [reportConfigs, setReportConfigs] = useState<any[]>([])
+  const [loadingReportConfigs, setLoadingReportConfigs] = useState(false)
 
   const form = useForm<SettingsValues>({
     resolver: zodResolver(SettingsSchema),
@@ -186,6 +188,90 @@ const Settings = () => {
     }
     canonical.href = window.location.href
   }, [])
+
+  // Load existing report configurations from database
+  const loadReportConfigs = async () => {
+    if (!isAuthenticated) return
+    
+    setLoadingReportConfigs(true)
+    try {
+      const result = await apiClient.getReportConfigs()
+      if (result.success && result.data) {
+        setReportConfigs(result.data)
+        return result.data
+      } else {
+        console.error('Failed to load report configurations:', result.error)
+        return []
+      }
+    } catch (error) {
+      console.error('Failed to load report configurations:', error)
+      return []
+    } finally {
+      setLoadingReportConfigs(false)
+    }
+  }
+
+  // Save report configurations to database
+  const saveReportConfigurations = async (reportingSettings: any) => {
+    const reportTypes = [
+      { type: 'DAILY_SUMMARY' as const, enabled: reportingSettings.dailySummary, name: 'Daily Summary Report' },
+      { type: 'WEEKLY_TREND' as const, enabled: reportingSettings.weeklyTrend, name: 'Weekly Trend Report' },
+      { type: 'MONTHLY_CAPACITY' as const, enabled: reportingSettings.monthlyCapacity, name: 'Monthly Capacity Report' }
+    ]
+
+    for (const reportType of reportTypes) {
+      try {
+        // Find existing config for this type
+        const existingConfig = reportConfigs.find(c => c.type === reportType.type)
+        
+        const configData = {
+          name: reportType.name,
+          type: reportType.type,
+          enabled: reportType.enabled,
+          deliveryTime: reportingSettings.timeOfDay,
+          timezone: reportingSettings.timezone,
+          emailRecipients: reportingSettings.recipients,
+          reportFormat: reportingSettings.format.toUpperCase() as 'HTML' | 'PDF' | 'CSV',
+          whatsappEnabled: reportingSettings.whatsappEnabled,
+          whatsappRecipients: reportingSettings.whatsappRecipients,
+          whatsappFormat: reportingSettings.whatsappFormat.toUpperCase() as 'SUMMARY' | 'DETAILED',
+          whatsappImageReport: reportingSettings.whatsappImageReport
+        }
+
+        if (existingConfig) {
+          // Update existing configuration
+          const updateResult = await apiClient.updateReportConfig(existingConfig.id, {
+            enabled: configData.enabled,
+            deliveryTime: configData.deliveryTime,
+            timezone: configData.timezone,
+            emailRecipients: configData.emailRecipients,
+            reportFormat: configData.reportFormat,
+            whatsappEnabled: configData.whatsappEnabled,
+            whatsappRecipients: configData.whatsappRecipients,
+            whatsappFormat: configData.whatsappFormat,
+            whatsappImageReport: configData.whatsappImageReport
+          })
+          
+          if (!updateResult.success) {
+            throw new Error(`Failed to update ${reportType.name}: ${updateResult.error}`)
+          }
+        } else {
+          // Create new configuration
+          const createResult = await apiClient.createReportConfig(configData)
+          
+          if (!createResult.success) {
+            throw new Error(`Failed to create ${reportType.name}: ${createResult.error}`)
+          }
+        }
+      } catch (error) {
+        console.error(`Error saving ${reportType.name}:`, error)
+        throw error
+      }
+    }
+
+    // Reload configurations to update state
+    await loadReportConfigs()
+  }
 
   // Load saved settings
   useEffect(() => {
@@ -229,6 +315,35 @@ const Settings = () => {
           }
         } catch (error) {
           console.error('Failed to load WhatsApp settings:', error)
+        }
+
+        // Load existing report configurations and update form with database values
+        const configs = await loadReportConfigs()
+        if (configs && configs.length > 0) {
+          // Update settings with database values
+          const dailyConfig = configs.find(c => c.type === 'DAILY_SUMMARY')
+          const weeklyConfig = configs.find(c => c.type === 'WEEKLY_TREND')
+          const monthlyConfig = configs.find(c => c.type === 'MONTHLY_CAPACITY')
+          
+          if (dailyConfig || weeklyConfig || monthlyConfig) {
+            // Use the first available config for shared settings (time, timezone, etc.)
+            const primaryConfig = dailyConfig || weeklyConfig || monthlyConfig
+            
+            settings.reporting = {
+              ...settings.reporting,
+              dailySummary: dailyConfig?.enabled ?? settings.reporting.dailySummary,
+              weeklyTrend: weeklyConfig?.enabled ?? settings.reporting.weeklyTrend,
+              monthlyCapacity: monthlyConfig?.enabled ?? settings.reporting.monthlyCapacity,
+              timeOfDay: primaryConfig?.deliveryTime || settings.reporting.timeOfDay,
+              timezone: primaryConfig?.timezone || settings.reporting.timezone,
+              format: primaryConfig?.reportFormat?.toLowerCase() || settings.reporting.format,
+              recipients: primaryConfig?.emailRecipients || settings.reporting.recipients,
+              whatsappEnabled: primaryConfig?.whatsappEnabled ?? settings.reporting.whatsappEnabled,
+              whatsappRecipients: primaryConfig?.whatsappRecipients || settings.reporting.whatsappRecipients,
+              whatsappFormat: primaryConfig?.whatsappFormat?.toLowerCase() || settings.reporting.whatsappFormat,
+              whatsappImageReport: primaryConfig?.whatsappImageReport ?? settings.reporting.whatsappImageReport,
+            }
+          }
         }
       } else {
         console.log('User not authenticated, skipping WhatsApp settings load')
@@ -619,13 +734,18 @@ const Settings = () => {
       if (!result.success) {
         throw new Error(result.error || 'Failed to save WhatsApp settings')
       }
+
+      // Save report configurations to database
+      await saveReportConfigurations(values.reporting)
       
-      // Save to localStorage for other settings (exclude WhatsApp as it's managed by backend)
+      // Save to localStorage for other settings (exclude WhatsApp and reporting as they're managed by backend)
       const settingsForLocalStorage = {
         ...values,
-        whatsapp: undefined // Don't save WhatsApp settings to localStorage
+        whatsapp: undefined, // Don't save WhatsApp settings to localStorage
+        reporting: undefined // Don't save reporting settings to localStorage
       }
       delete settingsForLocalStorage.whatsapp
+      delete settingsForLocalStorage.reporting
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsForLocalStorage))
       
       toast({ title: "Settings saved", description: "Your preferences have been updated." })
@@ -1187,7 +1307,7 @@ const Settings = () => {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Timezone</FormLabel>
-                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                            <Select onValueChange={field.onChange} value={field.value}>
                               <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select timezone" />
@@ -1195,9 +1315,12 @@ const Settings = () => {
                               </FormControl>
                               <SelectContent>
                                 <SelectItem value="UTC">UTC</SelectItem>
-                                <SelectItem value="America/New_York">America/New_York</SelectItem>
-                                <SelectItem value="Europe/London">Europe/London</SelectItem>
-                                <SelectItem value="Asia/Singapore">Asia/Singapore</SelectItem>
+                                <SelectItem value="America/New_York">America/New_York (EST/EDT)</SelectItem>
+                                <SelectItem value="Europe/London">Europe/London (GMT/BST)</SelectItem>
+                                <SelectItem value="Asia/Singapore">Asia/Singapore (SGT)</SelectItem>
+                                <SelectItem value="Asia/Jakarta">Asia/Jakarta (WIB +7)</SelectItem>
+                                <SelectItem value="Asia/Makassar">Asia/Makassar (WITA +8)</SelectItem>
+                                <SelectItem value="Asia/Jayapura">Asia/Jayapura (WIT +9)</SelectItem>
                               </SelectContent>
                             </Select>
                             <FormDescription>Used to schedule report delivery.</FormDescription>

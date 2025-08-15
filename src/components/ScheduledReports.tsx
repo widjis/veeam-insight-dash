@@ -3,6 +3,7 @@ import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { Plus, Edit, Trash2, Play, Pause, Calendar } from "lucide-react"
+import { DateTimeSelector } from "@/components/ui/DateTimeSelector"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -388,51 +389,19 @@ const ScheduledReports = () => {
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="dateRange"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Data Range</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select range" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="1d">Last 24 hours</SelectItem>
-                            <SelectItem value="7d">Last 7 days</SelectItem>
-                            <SelectItem value="30d">Last 30 days</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="timezone"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Timezone</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select timezone" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="UTC">UTC</SelectItem>
-                            <SelectItem value="America/New_York">America/New_York</SelectItem>
-                            <SelectItem value="Europe/London">Europe/London</SelectItem>
-                            <SelectItem value="Asia/Singapore">Asia/Singapore</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div className="col-span-2">
+                    <DateTimeSelector
+                      showDateRangePresets={true}
+                      dateRangeValue={form.watch('dateRange')}
+                      onDateRangeChange={(value) => form.setValue('dateRange', value as '1d' | '7d' | '30d')}
+                      dateRangeLabel="Data Range"
+                      showTimezoneSelector={true}
+                      timezoneValue={form.watch('timezone')}
+                      onTimezoneChange={(value) => form.setValue('timezone', value)}
+                      timezoneLabel="Timezone"
+                      layout="horizontal"
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-4">

@@ -6,6 +6,7 @@ import config from '../config/environment.js';
 import nodemailer from 'nodemailer';
 import fetch from 'node-fetch';
 import { generateReportData } from '../routes/reports.js';
+import { ReportConfigService } from './ReportConfigService.js';
 
 export interface ScheduledReportConfig {
   id: string;
@@ -47,7 +48,10 @@ export class ScheduledReportService {
   constructor(alertService: AlertService) {
     this.alertService = alertService;
     this.initializeEmailTransporter();
-    this.loadDefaultScheduledReports();
+    // Load report configs asynchronously after construction
+    this.loadReportConfigsFromDatabase().catch(error => {
+      logger.error('Failed to load report configurations during initialization:', error);
+    });
   }
 
   public start(): void {
@@ -114,93 +118,149 @@ export class ScheduledReportService {
     }
   }
 
-  private loadDefaultScheduledReports(): void {
-    const defaultReports: ScheduledReportConfig[] = [
-      {
-        id: 'daily-summary',
-        name: 'Daily Summary Report',
-        enabled: true,
-        schedule: '0 9 * * *', // Every day at 9:00 AM
-        reportType: 'summary',
-        format: 'html',
-        includeJobs: true,
-        includeRepositories: true,
-        includeAlerts: true,
-        dateRange: 'daily',
-        delivery: {
-          email: {
-            enabled: true,
-            recipients: ['admin@company.com'],
-            subject: 'Daily Veeam Backup Summary Report',
-          },
-          whatsapp: {
-            enabled: false,
-            recipients: [],
-            format: 'summary',
-          },
-        },
-        timezone: 'UTC',
-        createdAt: new Date(),
-      },
-      {
-        id: 'weekly-detailed',
-        name: 'Weekly Detailed Report',
-        enabled: false,
-        schedule: '0 8 * * 1', // Every Monday at 8:00 AM
-        reportType: 'detailed',
-        format: 'pdf',
-        includeJobs: true,
-        includeRepositories: true,
-        includeAlerts: true,
-        dateRange: 'weekly',
-        delivery: {
-          email: {
-            enabled: true,
-            recipients: ['admin@company.com', 'manager@company.com'],
-            subject: 'Weekly Veeam Backup Detailed Report',
-          },
-          whatsapp: {
-            enabled: false,
-            recipients: [],
-            format: 'summary',
-          },
-        },
-        timezone: 'UTC',
-        createdAt: new Date(),
-      },
-      {
-        id: 'monthly-capacity',
-        name: 'Monthly Capacity Planning Report',
-        enabled: false,
-        schedule: '0 7 1 * *', // First day of every month at 7:00 AM
-        reportType: 'custom',
-        format: 'pdf',
-        includeJobs: false,
-        includeRepositories: true,
-        includeAlerts: false,
-        dateRange: 'monthly',
-        delivery: {
-          email: {
-            enabled: true,
-            recipients: ['admin@company.com', 'storage@company.com'],
-            subject: 'Monthly Veeam Storage Capacity Report',
-          },
-          whatsapp: {
-            enabled: false,
-            recipients: [],
-            format: 'summary',
-          },
-        },
-        timezone: 'UTC',
-        createdAt: new Date(),
-      },
-    ];
+  private async loadReportConfigsFromDatabase(): Promise<void> {
+    try {
+      const reportConfigs = await ReportConfigService.getEnabledConfigs();
+      
+      for (const config of reportConfigs) {
+        const scheduledReport: ScheduledReportConfig = this.convertReportConfigToScheduledReport(config);
+        this.scheduledReports.set(scheduledReport.id, scheduledReport);
+      }
+      
+      logger.info(`Loaded ${reportConfigs.length} report configurations from database`);
+    } catch (error) {
+      logger.error('Failed to load report configurations from database:', error);
+      // Fallback to default reports if database loading fails
+      this.loadFallbackReports();
+    }
+  }
 
-    defaultReports.forEach(report => {
-      this.scheduledReports.set(report.id, report);
-    });
+  private convertReportConfigToScheduledReport(config: any): ScheduledReportConfig {
+    // Convert database ReportConfig to ScheduledReportConfig format
+    const cronExpression = this.generateCronExpression(config.type, config.deliveryTime);
+    
+    return {
+      id: config.id.toString(),
+      name: config.name,
+      enabled: config.enabled,
+      schedule: cronExpression,
+      reportType: this.mapReportType(config.type),
+      format: config.reportFormat.toLowerCase() as 'html' | 'pdf' | 'csv',
+      includeJobs: true,
+      includeRepositories: true,
+      includeAlerts: true,
+      dateRange: this.mapDateRange(config.type),
+      delivery: {
+        email: {
+          enabled: config.emailRecipients && config.emailRecipients.length > 0,
+          recipients: config.emailRecipients || [],
+          subject: `${config.name} - Veeam Backup Report`,
+        },
+        whatsapp: {
+          enabled: config.whatsappEnabled || false,
+          recipients: config.whatsappRecipients || [],
+          format: config.whatsappFormat?.toLowerCase() as 'summary' | 'detailed' || 'summary',
+        },
+      },
+      timezone: config.timezone || 'UTC',
+      createdAt: config.createdAt,
+      lastRun: config.lastRun,
+    };
+  }
 
-    logger.info(`Loaded ${defaultReports.length} default scheduled reports`);
+  private generateCronExpression(reportType: string, deliveryTime: string): string {
+    const [hours, minutes] = deliveryTime.split(':').map(Number);
+    
+    switch (reportType) {
+      case 'DAILY_SUMMARY':
+        return `${minutes} ${hours} * * *`; // Every day at specified time
+      case 'WEEKLY_TREND':
+        return `${minutes} ${hours} * * 1`; // Every Monday at specified time
+      case 'MONTHLY_CAPACITY':
+        return `${minutes} ${hours} 1 * *`; // First day of every month at specified time
+      default:
+        return `${minutes} ${hours} * * *`; // Default to daily
+    }
+  }
+
+  private mapReportType(dbType: string): 'summary' | 'detailed' | 'custom' {
+    switch (dbType) {
+      case 'DAILY_SUMMARY':
+        return 'summary';
+      case 'WEEKLY_TREND':
+        return 'detailed';
+      case 'MONTHLY_CAPACITY':
+        return 'custom';
+      default:
+        return 'summary';
+    }
+  }
+
+  private mapDateRange(dbType: string): 'daily' | 'weekly' | 'monthly' | 'custom' {
+    switch (dbType) {
+      case 'DAILY_SUMMARY':
+        return 'daily';
+      case 'WEEKLY_TREND':
+        return 'weekly';
+      case 'MONTHLY_CAPACITY':
+        return 'monthly';
+      default:
+        return 'daily';
+    }
+  }
+
+  private loadFallbackReports(): void {
+    const fallbackReport: ScheduledReportConfig = {
+      id: 'fallback-daily',
+      name: 'Daily Summary Report (Fallback)',
+      enabled: true,
+      schedule: '0 9 * * *', // Every day at 9:00 AM
+      reportType: 'summary',
+      format: 'html',
+      includeJobs: true,
+      includeRepositories: true,
+      includeAlerts: true,
+      dateRange: 'daily',
+      delivery: {
+        email: {
+          enabled: false,
+          recipients: [],
+        },
+        whatsapp: {
+          enabled: false,
+          recipients: [],
+          format: 'summary',
+        },
+      },
+      timezone: 'UTC',
+      createdAt: new Date(),
+    };
+
+    this.scheduledReports.set(fallbackReport.id, fallbackReport);
+    logger.info('Loaded fallback report configuration');
+  }
+
+  public async reloadReportConfigs(): Promise<void> {
+    // Stop all current jobs
+    for (const [reportId, job] of this.scheduledJobs) {
+      job.stop();
+    }
+    this.scheduledJobs.clear();
+    this.scheduledReports.clear();
+
+    // Reload from database
+    await this.loadReportConfigsFromDatabase();
+
+    // Restart jobs if service is running
+    if (this.isRunning) {
+      for (const [reportId, reportConfig] of this.scheduledReports) {
+        if (reportConfig.enabled) {
+          this.scheduleReport(reportId, reportConfig);
+        }
+      }
+    }
+
+    logger.info('Report configurations reloaded from database');
   }
 
   public startScheduler(): void {
@@ -286,9 +346,17 @@ export class ScheduledReportService {
       // Deliver report
       await this.deliverReport(report, reportData.data, formattedReport.data);
       
-      // Update last run time
-      report.lastRun = new Date();
+      // Update last run time in memory and database
+      const lastRunTime = new Date();
+      report.lastRun = lastRunTime;
       report.nextRun = this.getNextRunTime(report.schedule, report.timezone);
+      
+      // Update last run time in database
+       try {
+         await ReportConfigService.updateLastRun(id, lastRunTime);
+       } catch (dbError) {
+         logger.warn(`Failed to update last run time in database for report ${id}:`, dbError);
+       }
       
       logger.info(`Successfully executed scheduled report: ${report.name} (${id})`);
     } catch (error) {

@@ -1,5 +1,57 @@
 # WhatsApp Report Enhancements - August 15, 2025
 
+## Time Clock Interface Optimization - COMPLETED (23:59 WIB)
+
+### Enhancement Applied
+- **Issue**: Redundant date/time selection components between Reports and Scheduled Reports pages
+- **User Request**: "Review and optimize time clock interfaces - eliminate redundancy between Reports and Scheduled Reports time selection"
+- **Solution**: Created reusable DateTimeSelector component to eliminate code duplication
+
+### Technical Implementation
+- **New Component**: `src/components/ui/DateTimeSelector.tsx`
+- **Features Implemented**:
+  - Configurable date range selection (custom from/to dates)
+  - Date range presets (Last 24 hours, 7 days, 30 days)
+  - Time selector with input field
+  - Timezone selector with comprehensive options including Indonesian timezones (WIB, WITA, WIT)
+  - Flexible layout options (horizontal, vertical, grid)
+- **Files Updated**:
+  - `src/pages/Reports.tsx` - Replaced custom date range selection with DateTimeSelector
+  - `src/components/ScheduledReports.tsx` - Replaced data range and timezone selection with DateTimeSelector
+
+### Code Changes
+```typescript
+// New reusable component with configurable props
+<DateTimeSelector
+  showDateRange={true}
+  dateFrom={dateRange.from}
+  dateTo={dateRange.to}
+  onDateFromChange={(date) => setDateRange(prev => ({ ...prev, from: date }))}
+  onDateToChange={(date) => setDateRange(prev => ({ ...prev, to: date }))}
+  layout="grid"
+/>
+
+// Scheduled Reports integration
+<DateTimeSelector
+  showDateRangePresets={true}
+  dateRangeValue={form.watch('dateRange')}
+  onDateRangeChange={(value) => form.setValue('dateRange', value)}
+  showTimezoneSelector={true}
+  timezoneValue={form.watch('timezone')}
+  onTimezoneChange={(value) => form.setValue('timezone', value)}
+  layout="horizontal"
+/>
+```
+
+### Results
+- **OPTIMIZED** - Eliminated code duplication between Reports and Scheduled Reports
+- **CONSISTENT** - Unified UI/UX across different report interfaces
+- **MAINTAINABLE** - Centralized date/time selection logic for easier future enhancements
+- **VALIDATED** - TypeScript compilation successful, no errors introduced
+- **COMPLETE** - Both components now use the same underlying DateTimeSelector component
+
+---
+
 ## Warning Jobs Details Enhancement - COMPLETED (23:34 WIB)
 
 ### Enhancement Applied
@@ -4006,5 +4058,86 @@ const recentWarnings = jobs.filter((job: any) => job.result === 'Warning' || job
 
 ---
 
-*Last Updated: August 15, 2025 at 23:40 WIB*
+# Automated Reporting System Implementation - August 16, 2025
+
+## Database-Driven Report Configuration - COMPLETED (00:26 WIB)
+
+### Enhancement Applied
+- **Issue**: Report configurations were stored in localStorage, preventing automated scheduling
+- **User Request**: Implement persistent database storage for report configurations with automatic WhatsApp delivery
+- **Solution**: Complete automated reporting system with database persistence and scheduler integration
+
+### Database Model Implementation
+- **Added ReportConfig model** to Prisma schema (`server/prisma/schema.prisma`):
+  - Fields: `id`, `name`, `type`, `enabled`, `schedule`, `timezone`, `recipients`, `lastRun`, `createdAt`, `updatedAt`
+  - Supports daily summary, weekly trend, and monthly capacity report configurations
+  - Includes JSON field for recipients and schedule configuration
+
+- **Created ReportConfigService** (`server/src/services/ReportConfigService.ts`):
+  - CRUD operations: `getAll`, `getById`, `getEnabledConfigs`, `create`, `update`, `delete`, `toggle`
+  - Database interaction layer for report configurations
+  - Includes `updateLastRun` method for tracking execution times
+
+- **Added ReportConfig API routes** (`server/src/routes/report-configs.ts`):
+  - GET `/api/report-configs` - List all configurations
+  - GET `/api/report-configs/enabled` - Get enabled configurations
+  - POST `/api/report-configs` - Create new configuration
+  - PUT `/api/report-configs/:id` - Update configuration
+  - DELETE `/api/report-configs/:id` - Delete configuration
+  - PATCH `/api/report-configs/:id/toggle` - Toggle enabled status
+
+### Frontend Integration
+- **Updated API client** (`src/services/api.ts`):
+  - Added methods: `getReportConfigs`, `getEnabledReportConfigs`, `createReportConfig`, `updateReportConfig`, `deleteReportConfig`, `toggleReportConfig`
+  - Full CRUD support for report configurations
+
+- **Enhanced Settings page** (`src/pages/Settings.tsx`):
+  - **Database persistence**: Report settings now save to PostgreSQL instead of localStorage
+  - **Load configurations**: Fetches existing report configs on page load
+  - **Save configurations**: Creates/updates report configs in database
+  - **State management**: Added `reportConfigs` and `loadingReportConfigs` state
+  - **Integration**: `loadReportConfigs()` and `saveReportConfigurations()` functions
+
+### Automated Scheduling System
+- **Enhanced ScheduledReportService** (`server/src/services/ScheduledReportService.ts`):
+  - **Database integration**: Replaced hardcoded reports with database-driven configurations
+  - **Dynamic loading**: `loadReportConfigsFromDatabase()` fetches enabled configs from ReportConfigService
+  - **Configuration mapping**: Converts ReportConfig to ScheduledReportConfig format
+  - **Cron generation**: `generateCronExpression()` creates schedule from config
+  - **Runtime updates**: `reloadReportConfigs()` allows dynamic schedule updates
+  - **Execution tracking**: Updates `lastRun` timestamp in database after report execution
+  - **Error handling**: Fallback to default reports if database loading fails
+
+- **Server integration** (`server/src/server.ts`):
+  - **Automatic startup**: ScheduledReportService starts after database initialization
+  - **Graceful shutdown**: Proper cleanup on SIGTERM/SIGINT signals
+  - **Error handling**: Continues operation even if scheduler fails to start
+
+### Database Credentials Update
+- **Updated PostgreSQL credentials** across all configuration files:
+  - Changed from `veeam_insight:VeeamInsight2025!` to `vaultuser:VaultP@ssw0rd!`
+  - Updated files: `.env`, `server/.env`, `.env.example`, `server/.env.example`, `docs/database-user-setup.md`
+  - Database URL now: `postgresql://vaultuser:VaultP@ssw0rd!@10.60.10.59:5432/veeam_insight_db`
+
+### System Architecture
+- **Complete flow**: UI → Database → Scheduler → WhatsApp delivery
+- **Real-time updates**: Changes in Settings page immediately affect scheduled reports
+- **Persistent storage**: All configurations stored in PostgreSQL
+- **Automatic execution**: Reports sent based on database configurations
+- **Monitoring**: Execution times tracked and logged
+
+### Results
+- **AUTOMATED** - Reports now automatically send based on database configurations
+- **PERSISTENT** - All settings stored in PostgreSQL database
+- **DYNAMIC** - Schedule changes take effect without server restart
+- **TRACKED** - Execution times logged for monitoring
+- **SCALABLE** - Support for unlimited report configurations
+- **RELIABLE** - Error handling and fallback mechanisms
+
+### Status
+**COMPLETED** - Automated reporting system fully implemented and operational
+
+---
+
+*Last Updated: August 16, 2025 at 00:26 WIB*
 *Analyst: TRAE AI Agent*
