@@ -1,5 +1,5 @@
 import * as React from "react"
-import { useEffect } from "react"
+import { useEffect, useState } from "react"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
@@ -25,6 +25,13 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import {
   Form,
   FormControl,
@@ -80,6 +87,7 @@ const SettingsSchema = z.object({
     whatsappEnabled: z.boolean().default(false),
     whatsappRecipients: z.string().optional().default(""),
     whatsappFormat: z.enum(["summary", "detailed"]).default("summary"),
+    whatsappImageReport: z.boolean().default(false),
   }),
   general: z.object({
     pollIntervalSec: z.coerce.number().min(10).max(3600).default(60),
@@ -130,6 +138,7 @@ const DEFAULT_SETTINGS: SettingsValues = {
     whatsappEnabled: false,
     whatsappRecipients: "",
     whatsappFormat: "summary",
+    whatsappImageReport: false,
   },
   general: {
     pollIntervalSec: 60,
@@ -142,6 +151,8 @@ const STORAGE_KEY = "veeam-settings"
 const Settings = () => {
   const { toast } = useToast()
   const { isAuthenticated } = useAuth()
+  const [previewModalOpen, setPreviewModalOpen] = useState(false)
+  const [previewContent, setPreviewContent] = useState<string>('')
 
   const form = useForm<SettingsValues>({
     resolver: zodResolver(SettingsSchema),
@@ -383,6 +394,156 @@ const Settings = () => {
       toast({
         title: "Error",
         description: "Failed to send WhatsApp test report",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handlePreviewReport = async () => {
+    try {
+      toast({
+        title: "Generating Preview",
+        description: "Creating report preview...",
+      })
+
+      const today = new Date()
+      const yesterday = new Date(today)
+      yesterday.setDate(yesterday.getDate() - 1)
+
+      const result = await apiClient.previewReport({
+        type: 'summary',
+        startDate: yesterday.toISOString().split('T')[0],
+        endDate: today.toISOString().split('T')[0],
+        includeJobs: true,
+        includeRepositories: true,
+        includeAlerts: true,
+      })
+
+      if (result.success && result.data) {
+        setPreviewContent(result.data)
+        setPreviewModalOpen(true)
+        
+        toast({
+          title: "Preview Generated",
+          description: "Report preview is ready.",
+        })
+      } else {
+        throw new Error(result.error || 'Failed to generate preview')
+      }
+    } catch (error: any) {
+      console.error('Preview generation failed:', error)
+      toast({
+        title: "Preview Failed",
+        description: error.message || "Failed to generate report preview.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSendEmailNow = async () => {
+    try {
+      const emailRecipients = form.getValues("reporting.recipients")
+      if (!emailRecipients || emailRecipients.trim() === "") {
+        toast({
+          title: "Email Recipients Required",
+          description: "Please enter email recipients before sending.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Parse recipients (comma-separated)
+      const recipients = emailRecipients.split(',').map(r => r.trim()).filter(r => r.length > 0)
+      
+      if (recipients.length === 0) {
+        toast({
+          title: "Invalid Recipients",
+          description: "Please enter valid email recipients.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      toast({
+        title: "Sending Email Report",
+        description: `Sending report to ${recipients.length} recipient(s)...`,
+      })
+
+      const result = await apiClient.sendEmailReport({
+        recipients,
+        subject: `Veeam Report - ${new Date().toLocaleDateString()}`,
+        format: 'summary',
+        reportType: 'daily',
+        reportFormat: form.getValues("reporting.format") || 'html',
+      })
+
+      if (result.success) {
+        toast({
+          title: "Email Sent",
+          description: `Report sent successfully to ${recipients.length} recipient(s).`,
+        })
+      } else {
+        throw new Error(result.error || 'Failed to send email report')
+      }
+    } catch (error: any) {
+      console.error('Email send failed:', error)
+      toast({
+        title: "Email Send Failed",
+        description: error.message || "Failed to send email report. Please check your email settings.",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleSendWhatsAppNow = async () => {
+    try {
+      const whatsappRecipients = form.getValues("reporting.whatsappRecipients")
+      if (!whatsappRecipients || whatsappRecipients.trim() === "") {
+        toast({
+          title: "WhatsApp Recipients Required",
+          description: "Please enter WhatsApp recipients before sending.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      // Parse recipients (comma-separated)
+      const recipients = whatsappRecipients.split(',').map(r => r.trim()).filter(r => r.length > 0)
+      
+      if (recipients.length === 0) {
+        toast({
+          title: "Invalid Recipients",
+          description: "Please enter valid WhatsApp recipients.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      toast({
+        title: "Sending WhatsApp Report",
+        description: `Sending report to ${recipients.length} recipient(s)...`,
+      })
+
+      const result = await apiClient.sendWhatsAppReport({
+        recipients,
+        format: form.getValues("reporting.whatsappFormat") || "summary",
+        reportType: 'daily',
+        useImageReport: form.getValues("reporting.whatsappImageReport") || false
+      })
+
+      if (result.success) {
+        toast({
+          title: "WhatsApp Sent",
+          description: `Report sent successfully to ${result.data?.successCount || 0}/${recipients.length} recipient(s).`,
+        })
+      } else {
+        throw new Error(result.error || 'Failed to send WhatsApp report')
+      }
+    } catch (error: any) {
+      console.error('WhatsApp send failed:', error)
+      toast({
+        title: "WhatsApp Send Failed",
+        description: error.message || "Failed to send WhatsApp report. Please check your WhatsApp settings.",
         variant: "destructive",
       })
     }
@@ -1049,77 +1210,145 @@ const Settings = () => {
                       </div>
 
                       {form.watch("reporting.whatsappEnabled") && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <FormField
-                            control={form.control}
-                            name="reporting.whatsappRecipients"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>WhatsApp Recipients</FormLabel>
-                                <FormControl>
-                                  <Textarea 
-                                    rows={3} 
-                                    placeholder="+6281234567890, +6287654321098" 
-                                    {...field} 
-                                  />
-                                </FormControl>
-                                <FormDescription>Comma-separated phone numbers with country code.</FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <FormField
-                            control={form.control}
-                            name="reporting.whatsappFormat"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>WhatsApp Report Format</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <div className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="reporting.whatsappRecipients"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>WhatsApp Recipients</FormLabel>
                                   <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select format" />
-                                    </SelectTrigger>
+                                    <Textarea 
+                                      rows={3} 
+                                      placeholder="+6281234567890, +6287654321098" 
+                                      {...field} 
+                                    />
                                   </FormControl>
-                                  <SelectContent>
-                                    <SelectItem value="summary">Summary (Brief)</SelectItem>
-                                    <SelectItem value="detailed">Detailed (Full Stats)</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                <FormDescription>Choose report detail level for WhatsApp.</FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+                                  <FormDescription>Comma-separated phone numbers with country code.</FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={form.control}
+                              name="reporting.whatsappFormat"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>WhatsApp Report Format</FormLabel>
+                                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select format" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="summary">Summary (Brief)</SelectItem>
+                                      <SelectItem value="detailed">Detailed (Full Stats)</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormDescription>Choose report detail level for WhatsApp.</FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                          
+                          <div className="border-t pt-4">
+                            <FormField
+                              control={form.control}
+                              name="reporting.whatsappImageReport"
+                              render={({ field }) => (
+                                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                                  <div className="space-y-0.5">
+                                    <FormLabel className="text-base">Comprehensive Image Report</FormLabel>
+                                    <FormDescription>
+                                      Generate visual report as image from HTML capture for WhatsApp delivery. 
+                                      This creates a comprehensive visual summary of all monitoring data.
+                                    </FormDescription>
+                                  </div>
+                                  <FormControl>
+                                    <Switch
+                                      checked={field.value}
+                                      onCheckedChange={field.onChange}
+                                    />
+                                  </FormControl>
+                                </FormItem>
+                              )}
+                            />
+                          </div>
                         </div>
                       )}
                     </div>
                   </CardContent>
-                  <CardFooter className="flex justify-between">
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() =>
-                          toast({
-                            title: "Test email report sent",
-                            description: "A preview email report has been generated (mock).",
-                          })
-                        }
-                      >
-                        Test Email Report
-                      </Button>
-                      {form.watch("reporting.whatsappEnabled") && (
+                  <CardFooter className="flex flex-col gap-4">
+                    {/* Generate Report Now Section */}
+                    <div className="w-full">
+                      <h4 className="text-sm font-medium mb-3">Generate Report Now</h4>
+                      <div className="flex flex-wrap gap-2">
                         <Button
                           type="button"
                           variant="outline"
-                          onClick={handleTestWhatsAppReport}
-                          disabled={!form.watch("whatsapp.enabled")}
+                          onClick={handlePreviewReport}
+                          className="flex-1 min-w-[140px]"
                         >
-                          Test WhatsApp Report
+                          Report Preview
                         </Button>
-                      )}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleSendEmailNow}
+                          className="flex-1 min-w-[140px]"
+                        >
+                          Send to Email Now
+                        </Button>
+                        {form.watch("reporting.whatsappEnabled") && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleSendWhatsAppNow}
+                            disabled={!form.watch("reporting.whatsappEnabled")}
+                            className="flex-1 min-w-[140px]"
+                          >
+                            Send to WhatsApp Now
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                    <Button type="submit">Save changes</Button>
+                    
+                    {/* Test Section */}
+                    <div className="w-full">
+                      <h4 className="text-sm font-medium mb-3">Test Reports</h4>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() =>
+                            toast({
+                              title: "Test email report sent",
+                              description: "A preview email report has been generated (mock).",
+                            })
+                          }
+                        >
+                          Test Email Report
+                        </Button>
+                        {form.watch("reporting.whatsappEnabled") && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleTestWhatsAppReport}
+                            disabled={!form.watch("whatsapp.enabled")}
+                          >
+                            Test WhatsApp Report
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Save Button */}
+                    <div className="flex justify-end w-full">
+                      <Button type="submit">Save changes</Button>
+                    </div>
                   </CardFooter>
                 </Card>
               </TabsContent>
@@ -1233,6 +1462,24 @@ const Settings = () => {
           </Form>
         </Tabs>
       </main>
+
+      {/* Preview Modal */}
+      <Dialog open={previewModalOpen} onOpenChange={setPreviewModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle>Report Preview</DialogTitle>
+            <DialogDescription>
+              Preview of the generated report content
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto border rounded-md p-4 bg-white min-h-0">
+            <div 
+              dangerouslySetInnerHTML={{ __html: previewContent }}
+              className="prose prose-sm max-w-none"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

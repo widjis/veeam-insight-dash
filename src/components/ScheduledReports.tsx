@@ -147,7 +147,7 @@ const ScheduledReports = () => {
   const fetchReports = async () => {
     try {
       setLoading(true)
-      const response = await apiClient.get('/api/scheduled-reports')
+      const response = await apiClient.get('/scheduled-reports')
       // Handle the backend response format: { success: boolean, data: array }
       if (response.success && Array.isArray(response.data)) {
         setReports(response.data)
@@ -176,13 +176,13 @@ const ScheduledReports = () => {
   const onSubmit = async (data: ScheduledReportFormData) => {
     try {
       if (editingReport) {
-        await apiClient.put(`/api/scheduled-reports/${editingReport.id}`, data)
+        await apiClient.put(`/scheduled-reports/${editingReport.id}`, data)
         toast({
           title: "Success",
           description: "Scheduled report updated successfully",
         })
       } else {
-        await apiClient.post('/api/scheduled-reports', data)
+        await apiClient.post('/scheduled-reports', data)
         toast({
           title: "Success",
           description: "Scheduled report created successfully",
@@ -221,7 +221,7 @@ const ScheduledReports = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      await apiClient.delete(`/api/scheduled-reports/${id}`)
+      await apiClient.delete(`/scheduled-reports/${id}`)
       toast({
         title: "Success",
         description: "Scheduled report deleted successfully",
@@ -238,7 +238,7 @@ const ScheduledReports = () => {
 
   const handleToggle = async (id: string, enabled: boolean) => {
     try {
-      await apiClient.patch(`/api/scheduled-reports/${id}/toggle`, { enabled })
+      await apiClient.patch(`/scheduled-reports/${id}/toggle`, { enabled })
       toast({
         title: "Success",
         description: `Scheduled report ${enabled ? 'enabled' : 'disabled'} successfully`,
@@ -255,7 +255,7 @@ const ScheduledReports = () => {
 
   const handleTrigger = async (id: string) => {
     try {
-      await apiClient.post(`/api/scheduled-reports/${id}/trigger`)
+      await apiClient.post(`/scheduled-reports/${id}/trigger`)
       toast({
         title: "Success",
         description: "Report generation triggered successfully",

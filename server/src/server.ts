@@ -21,6 +21,7 @@ import settingsRoutes from '@/routes/settings.js';
 import databaseRoutes from '@/routes/database.js';
 import reportsRoutes, { setReportServices } from '@/routes/reports.js';
 import scheduledReportsRoutes, { setScheduledReportService } from '@/routes/scheduled-reports.js';
+import whatsappRoutes from '@/routes/whatsapp.js';
 import { VeeamService } from '@/services/VeeamService.js';
 import { MockVeeamService } from '@/services/MockVeeamService.js';
 import { WebSocketService } from '@/services/WebSocketService.js';
@@ -116,6 +117,7 @@ app.use('/api/settings', authMiddleware, settingsRoutes);
 app.use('/api/database', databaseRoutes);
 app.use('/api/reports', authMiddleware, reportsRoutes);
 app.use('/api/scheduled-reports', authMiddleware, scheduledReportsRoutes);
+app.use('/api/whatsapp', authMiddleware, whatsappRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {

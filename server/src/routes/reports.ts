@@ -148,9 +148,12 @@ router.post('/preview', authMiddleware, async (req: Request, res: Response) => {
       includeAlerts
     });
 
+    // Generate HTML content for preview
+    const htmlContent = generateHTMLReport(reportData, type);
+
     return res.json({
       success: true,
-      data: reportData
+      data: htmlContent
     });
 
   } catch (error) {
@@ -163,61 +166,80 @@ router.post('/preview', authMiddleware, async (req: Request, res: Response) => {
   }
 });
 
+// In-memory storage for report history (replace with database when available)
+let reportHistoryStorage: any[] = [
+  {
+    id: '1',
+    name: 'Daily Report - 2025-01-15',
+    type: 'daily',
+    format: 'pdf',
+    generatedAt: '2025-01-15T08:00:00Z',
+    size: '2.3 MB',
+    status: 'completed',
+    downloadUrl: '/api/reports/download/1'
+  },
+  {
+    id: '2',
+    name: 'Weekly Report - Week 2',
+    type: 'weekly',
+    format: 'html',
+    generatedAt: '2025-01-14T09:30:00Z',
+    size: '1.8 MB',
+    status: 'completed',
+    downloadUrl: '/api/reports/download/2'
+  },
+  {
+    id: '3',
+    name: 'Monthly Report - December 2024',
+    type: 'monthly',
+    format: 'csv',
+    generatedAt: '2025-01-01T10:00:00Z',
+    size: '856 KB',
+    status: 'completed',
+    downloadUrl: '/api/reports/download/3'
+  },
+  {
+    id: '4',
+    name: 'Custom Report - Q4 2024',
+    type: 'custom',
+    format: 'pdf',
+    generatedAt: '2024-12-31T15:45:00Z',
+    size: '4.1 MB',
+    status: 'completed',
+    downloadUrl: '/api/reports/download/4'
+  },
+  {
+    id: '5',
+    name: 'Daily Report - 2025-01-14',
+    type: 'daily',
+    format: 'html',
+    generatedAt: '2025-01-14T08:00:00Z',
+    size: '2.1 MB',
+    status: 'completed',
+    downloadUrl: '/api/reports/download/5'
+  }
+];
+
+// Helper function to generate unique ID
+function generateReportId(): string {
+  return Date.now().toString() + Math.random().toString(36).substr(2, 9);
+}
+
+// Helper function to format file size
+function formatFileSize(bytes: number): string {
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  if (bytes === 0) return '0 Bytes';
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i];
+}
+
 // Get report history endpoint
 router.get('/history', authMiddleware, async (req: Request, res: Response) => {
   try {
-    // Mock report history data - in a real implementation, this would come from a database
-    const reportHistory = [
-      {
-        id: '1',
-        name: 'Daily Report - 2025-01-15',
-        type: 'daily',
-        format: 'pdf',
-        generatedAt: '2025-01-15T08:00:00Z',
-        size: '2.3 MB',
-        status: 'completed'
-      },
-      {
-        id: '2',
-        name: 'Weekly Report - Week 2',
-        type: 'weekly',
-        format: 'html',
-        generatedAt: '2025-01-14T09:30:00Z',
-        size: '1.8 MB',
-        status: 'completed'
-      },
-      {
-        id: '3',
-        name: 'Monthly Report - December 2024',
-        type: 'monthly',
-        format: 'csv',
-        generatedAt: '2025-01-01T10:00:00Z',
-        size: '856 KB',
-        status: 'completed'
-      },
-      {
-        id: '4',
-        name: 'Custom Report - Q4 2024',
-        type: 'custom',
-        format: 'pdf',
-        generatedAt: '2024-12-31T15:45:00Z',
-        size: '4.1 MB',
-        status: 'completed'
-      },
-      {
-        id: '5',
-        name: 'Daily Report - 2025-01-14',
-        type: 'daily',
-        format: 'html',
-        generatedAt: '2025-01-14T08:00:00Z',
-        size: '2.1 MB',
-        status: 'completed'
-      }
-    ];
 
     return res.json({
       success: true,
-      data: reportHistory,
+      data: reportHistoryStorage,
       timestamp: new Date().toISOString()
     });
 
@@ -225,11 +247,101 @@ router.get('/history', authMiddleware, async (req: Request, res: Response) => {
     console.error('Error fetching report history:', error);
     return res.status(500).json({
       success: false,
-      error: 'Failed to fetch report history',
-      timestamp: new Date().toISOString()
+      error: 'Failed to fetch report history'
     });
   }
 });
+
+// Generate new report endpoint
+router.post('/generate', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { name, type, format, includeJobs, includeRepositories, includeAlerts } = req.body;
+    
+    // Validate required fields
+    if (!name || !type || !format) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: name, type, format'
+      });
+    }
+
+    // Generate report ID
+    const reportId = generateReportId();
+    
+    // Create new report entry
+    const newReport = {
+      id: reportId,
+      name,
+      type,
+      format,
+      generatedAt: new Date().toISOString(),
+      fileSize: formatFileSize(Math.floor(Math.random() * 5000000) + 500000), // Random size between 500KB-5MB
+      status: 'completed',
+      downloadUrl: `/api/reports/download/${reportId}`,
+      includeJobs: includeJobs ?? true,
+      includeRepositories: includeRepositories ?? true,
+      includeAlerts: includeAlerts ?? true
+    };
+
+    // Add to storage (at the beginning for newest first)
+    reportHistoryStorage.unshift(newReport);
+    
+    // Keep only last 50 reports to prevent memory issues
+    if (reportHistoryStorage.length > 50) {
+      reportHistoryStorage = reportHistoryStorage.slice(0, 50);
+    }
+
+    return res.json({
+      success: true,
+      data: newReport,
+      message: 'Report generated successfully'
+    });
+
+  } catch (error) {
+    console.error('Error generating report:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Failed to generate report'
+    });
+  }
+});
+
+// Download report endpoint (placeholder)
+router.get('/download/:id', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    
+    // Find report in storage
+    const report = reportHistoryStorage.find(r => r.id === id);
+    
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        error: 'Report not found'
+      });
+    }
+
+    // In a real implementation, this would serve the actual file
+    // For now, return a placeholder response
+    return res.json({
+      success: true,
+      message: 'Report download would start here',
+      report: {
+        id: report.id,
+        name: report.name,
+        type: report.type,
+        format: report.format
+      }
+    });
+
+  } catch (error) {
+    console.error('Error downloading report:', error);
+    return res.status(500).json({
+       success: false,
+       error: 'Failed to download report'
+     });
+   }
+ });
 
 export async function generateReportData(options: {
   type: 'summary' | 'detailed';

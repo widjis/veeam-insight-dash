@@ -402,14 +402,130 @@ class ApiClient {
     }
   }
 
+  // WhatsApp Configuration Methods
+  async getWhatsAppConfigs(): Promise<ApiResponse<any[]>> {
+    try {
+      const response = await this.axiosInstance.get('/whatsapp/config')
+      return {
+        success: true,
+        data: response.data.data,
+        timestamp: new Date().toISOString()
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to fetch WhatsApp configurations',
+        timestamp: new Date().toISOString()
+      }
+    }
+  }
+
+  async getActiveWhatsAppConfig(): Promise<ApiResponse<any>> {
+    try {
+      const response = await this.axiosInstance.get('/whatsapp/config/active')
+      return {
+        success: true,
+        data: response.data.data,
+        timestamp: new Date().toISOString()
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to fetch active WhatsApp configuration',
+        timestamp: new Date().toISOString()
+      }
+    }
+  }
+
+  async createWhatsAppConfig(config: {
+    name: string;
+    isActive?: boolean;
+    apiUrl?: string;
+    accessToken?: string;
+    phoneNumberId?: string;
+    enableImageReports?: boolean;
+    comprehensiveImageReport?: boolean;
+    imageQuality?: 'low' | 'medium' | 'high';
+    maxImageWidth?: number;
+    maxImageHeight?: number;
+    defaultRecipients?: string[];
+    reportMessageTemplate?: string;
+    alertMessageTemplate?: string;
+  }): Promise<ApiResponse<any>> {
+    try {
+      const response = await this.axiosInstance.post('/whatsapp/config', config)
+      return {
+        success: true,
+        data: response.data.data,
+        timestamp: new Date().toISOString()
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to create WhatsApp configuration',
+        timestamp: new Date().toISOString()
+      }
+    }
+  }
+
+  async updateWhatsAppConfig(id: string, config: {
+    name?: string;
+    isActive?: boolean;
+    apiUrl?: string;
+    accessToken?: string;
+    phoneNumberId?: string;
+    enableImageReports?: boolean;
+    comprehensiveImageReport?: boolean;
+    imageQuality?: 'low' | 'medium' | 'high';
+    maxImageWidth?: number;
+    maxImageHeight?: number;
+    defaultRecipients?: string[];
+    reportMessageTemplate?: string;
+    alertMessageTemplate?: string;
+  }): Promise<ApiResponse<any>> {
+    try {
+      const response = await this.axiosInstance.put(`/whatsapp/config/${id}`, config)
+      return {
+        success: true,
+        data: response.data.data,
+        timestamp: new Date().toISOString()
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to update WhatsApp configuration',
+        timestamp: new Date().toISOString()
+      }
+    }
+  }
+
+  async deleteWhatsAppConfig(id: string): Promise<ApiResponse<any>> {
+    try {
+      const response = await this.axiosInstance.delete(`/whatsapp/config/${id}`)
+      return {
+        success: true,
+        data: response.data,
+        timestamp: new Date().toISOString()
+      }
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to delete WhatsApp configuration',
+        timestamp: new Date().toISOString()
+      }
+    }
+  }
+
   async sendWhatsAppReport(data: {
     recipients: string[];
     format: 'summary' | 'detailed';
     reportType?: 'daily' | 'weekly' | 'monthly';
+    useImageReport?: boolean;
+    reportData?: any;
   }): Promise<ApiResponse<any>> {
     try {
       const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.post(
-        '/settings/whatsapp/send-report',
+        '/whatsapp/send-report',
         data
       );
       return response.data;
@@ -455,6 +571,29 @@ class ApiClient {
       return {
         success: false,
         error: error.response?.data?.error || 'Failed to fetch report history',
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
+
+  async generateNewReport(params: {
+    name: string;
+    type: string;
+    format: string;
+    includeJobs?: boolean;
+    includeRepositories?: boolean;
+    includeAlerts?: boolean;
+  }): Promise<ApiResponse<any>> {
+    try {
+      const response: AxiosResponse<ApiResponse<any>> = await this.axiosInstance.post(
+        '/reports/generate',
+        params
+      );
+      return response.data;
+    } catch (error: any) {
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Failed to generate report',
         timestamp: new Date().toISOString(),
       };
     }

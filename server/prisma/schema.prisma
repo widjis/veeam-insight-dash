@@ -189,6 +189,81 @@ model SystemConfig {
 }
 
 // ============================================================================
+// WHATSAPP CONFIGURATION MODELS
+// ============================================================================
+
+// WhatsApp configuration and settings
+model WhatsAppConfig {
+  id                    String   @id @default(cuid())
+  name                  String   @unique // Configuration name
+  isActive              Boolean  @default(true)
+  
+  // WhatsApp API settings
+  apiUrl                String?  // WhatsApp Business API URL
+  accessToken           String?  // API access token
+  phoneNumberId         String?  // WhatsApp Business phone number ID
+  
+  // Report settings
+  enableImageReports    Boolean  @default(false)
+  comprehensiveImageReport Boolean @default(false) // New feature for HTML capture
+  imageQuality          String   @default("high") // low, medium, high
+  maxImageWidth         Int      @default(1200)
+  maxImageHeight        Int      @default(800)
+  
+  // Default recipients
+  defaultRecipients     String[] // Array of phone numbers
+  
+  // Message templates
+  reportMessageTemplate String?  // Template for report messages
+  alertMessageTemplate  String?  // Template for alert messages
+  
+  // Metadata
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  createdBy             String?
+  
+  @@map("whatsapp_configs")
+}
+
+// ============================================================================
+// REPORT MANAGEMENT MODELS
+// ============================================================================
+
+// Generated reports history
+model ReportHistory {
+  id              String   @id @default(cuid())
+  name            String   // Report display name
+  type            ReportType // Report type
+  format          ReportFormat // Output format
+  
+  // Report metadata
+  generatedAt     DateTime @default(now())
+  fileSize        String?  // Human readable file size (e.g., "2.4 MB")
+  fileSizeBytes   Int?     // Actual file size in bytes
+  status          ReportStatus @default(GENERATING)
+  
+  // Report parameters
+  startDate       DateTime? // Report period start
+  endDate         DateTime? // Report period end
+  includeJobs     Boolean  @default(true)
+  includeRepositories Boolean @default(true)
+  includeAlerts   Boolean  @default(true)
+  
+  // File storage
+  filePath        String?  // Path to generated file
+  downloadUrl     String?  // URL for downloading
+  
+  // User context
+  generatedBy     String?  // User ID who generated the report
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("report_history")
+}
+
+// ============================================================================
 // AUDIT AND LOGGING MODELS
 // ============================================================================
 
@@ -252,6 +327,34 @@ enum AlertStatus {
   SUPPRESSED
   
   @@map("alert_status")
+}
+
+enum ReportType {
+  BACKUP_SUMMARY
+  JOB_PERFORMANCE
+  REPOSITORY_USAGE
+  ALERT_SUMMARY
+  CUSTOM
+  
+  @@map("report_type")
+}
+
+enum ReportFormat {
+  PDF
+  EXCEL
+  CSV
+  JSON
+  
+  @@map("report_format")
+}
+
+enum ReportStatus {
+  GENERATING
+  COMPLETED
+  FAILED
+  CANCELLED
+  
+  @@map("report_status")
 }
 
 enum AuditAction {

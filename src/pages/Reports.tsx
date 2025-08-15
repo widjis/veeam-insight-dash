@@ -1,7 +1,7 @@
 import * as React from "react"
 import { useState, useEffect } from "react"
 import { format } from "date-fns"
-import { CalendarIcon, Download, FileText, Mail, MessageSquare, RefreshCw } from "lucide-react"
+import { CalendarIcon, Download, FileText, Mail, MessageSquare, RefreshCw, Eye } from "lucide-react"
 import { Header } from "@/components/layout/Header"
 import { Button } from "@/components/ui/button"
 import {
@@ -38,6 +38,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { apiClient } from "@/services/api"
 import { cn } from "@/lib/utils"
@@ -84,6 +91,9 @@ const Reports = () => {
   const [jobSummary, setJobSummary] = useState<JobSummary[]>([])
   const [repositorySummary, setRepositorySummary] = useState<RepositorySummary[]>([])
   const [dashboardStats, setDashboardStats] = useState<any>(null)
+  const [previewModalOpen, setPreviewModalOpen] = useState(false)
+  const [previewContent, setPreviewContent] = useState<string>('')
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false)
 
   // Load real data from API
   useEffect(() => {
@@ -93,71 +103,22 @@ const Reports = () => {
         if (result.success && result.data) {
           setReports(result.data)
         } else {
-          // Fallback to mock data if API fails
-          const mockReports: ReportData[] = [
-            {
-              id: '1',
-              name: 'Daily Backup Report - 2025-08-15',
-              type: 'daily',
-              format: 'pdf',
-              generatedAt: '2025-08-15T09:00:00Z',
-              size: '2.4 MB',
-              status: 'completed'
-            },
-            {
-              id: '2',
-              name: 'Weekly Summary - Week 33',
-              type: 'weekly',
-              format: 'html',
-              generatedAt: '2025-08-14T18:00:00Z',
-              size: '1.8 MB',
-              status: 'completed'
-            },
-            {
-              id: '3',
-              name: 'Monthly Capacity Report - July 2025',
-              type: 'monthly',
-              format: 'csv',
-              generatedAt: '2025-08-01T10:00:00Z',
-              size: '856 KB',
-              status: 'completed'
-            }
-          ]
-          setReports(mockReports)
+          console.error('Failed to load report history:', result.error)
+          setReports([])
+          toast({
+            title: "Error",
+            description: "Failed to load report history",
+            variant: "destructive",
+          })
         }
       } catch (error) {
         console.error('Failed to load report history:', error)
-        // Use mock data as fallback
-        const mockReports: ReportData[] = [
-          {
-            id: '1',
-            name: 'Daily Backup Report - 2025-08-15',
-            type: 'daily',
-            format: 'pdf',
-            generatedAt: '2025-08-15T09:00:00Z',
-            size: '2.4 MB',
-            status: 'completed'
-          },
-          {
-            id: '2',
-            name: 'Weekly Summary - Week 33',
-            type: 'weekly',
-            format: 'html',
-            generatedAt: '2025-08-14T18:00:00Z',
-            size: '1.8 MB',
-            status: 'completed'
-          },
-          {
-            id: '3',
-            name: 'Monthly Capacity Report - July 2025',
-            type: 'monthly',
-            format: 'csv',
-            generatedAt: '2025-08-01T10:00:00Z',
-            size: '856 KB',
-            status: 'completed'
-          }
-        ]
-        setReports(mockReports)
+        setReports([])
+        toast({
+          title: "Error",
+          description: "Failed to load report history",
+          variant: "destructive",
+        })
       }
     }
 
@@ -177,73 +138,17 @@ const Reports = () => {
            }))
           setJobSummary(jobSummary)
         } else {
-          // Fallback to mock data
-          const mockJobs: JobSummary[] = [
-            {
-              name: 'SQL Server Backup',
-              status: 'Success',
-              lastRun: '2025-08-15T02:00:00Z',
-              duration: '45m 23s',
-              dataSize: '2.5 GB'
-            },
-            {
-              name: 'File Server Backup',
-              status: 'Success',
-              lastRun: '2025-08-15T01:30:00Z',
-              duration: '1h 12m',
-              dataSize: '15.2 GB'
-            },
-            {
-              name: 'Exchange Backup',
-              status: 'Failed',
-              lastRun: '2025-08-15T03:00:00Z',
-              duration: '12m 45s',
-              dataSize: '0 GB'
-            },
-            {
-              name: 'VM Backup',
-              status: 'Success',
-              lastRun: '2025-08-15T00:30:00Z',
-              duration: '2h 35m',
-              dataSize: '45.8 GB'
-            }
-          ]
-          setJobSummary(mockJobs)
+          console.error('Failed to load job summary:', result.error)
+          setJobSummary([])
         }
       } catch (error) {
         console.error('Failed to load job summary:', error)
-        // Use mock data as fallback
-        const mockJobs: JobSummary[] = [
-          {
-            name: 'SQL Server Backup',
-            status: 'Success',
-            lastRun: '2025-08-15T02:00:00Z',
-            duration: '45m 23s',
-            dataSize: '2.5 GB'
-          },
-          {
-            name: 'File Server Backup',
-            status: 'Success',
-            lastRun: '2025-08-15T01:30:00Z',
-            duration: '1h 12m',
-            dataSize: '15.2 GB'
-          },
-          {
-            name: 'Exchange Backup',
-            status: 'Failed',
-            lastRun: '2025-08-15T03:00:00Z',
-            duration: '12m 45s',
-            dataSize: '0 GB'
-          },
-          {
-            name: 'VM Backup',
-            status: 'Success',
-            lastRun: '2025-08-15T00:30:00Z',
-            duration: '2h 35m',
-            dataSize: '45.8 GB'
-          }
-        ]
-        setJobSummary(mockJobs)
+        setJobSummary([])
+        toast({
+          title: "Error",
+          description: "Failed to load job summary",
+          variant: "destructive",
+        })
       }
     }
 
@@ -261,45 +166,17 @@ const Reports = () => {
           }))
           setRepositorySummary(repoSummary)
         } else {
-          // Fallback to mock data
-          const mockRepositories: RepositorySummary[] = [
-            {
-              name: 'Primary Repository',
-              totalCapacity: 2048,
-              usedSpace: 1536,
-              freeSpace: 512,
-              usagePercent: 75
-            },
-            {
-              name: 'Secondary Repository',
-              totalCapacity: 1024,
-              usedSpace: 840,
-              freeSpace: 184,
-              usagePercent: 82
-            }
-          ]
-          setRepositorySummary(mockRepositories)
+          console.error('Failed to load repository summary:', result.error)
+          setRepositorySummary([])
         }
       } catch (error) {
         console.error('Failed to load repository summary:', error)
-        // Use mock data as fallback
-        const mockRepositories: RepositorySummary[] = [
-          {
-            name: 'Primary Repository',
-            totalCapacity: 2048,
-            usedSpace: 1536,
-            freeSpace: 512,
-            usagePercent: 75
-          },
-          {
-            name: 'Secondary Repository',
-            totalCapacity: 1024,
-            usedSpace: 840,
-            freeSpace: 184,
-            usagePercent: 82
-          }
-        ]
-        setRepositorySummary(mockRepositories)
+        setRepositorySummary([])
+        toast({
+          title: "Error",
+          description: "Failed to load repository summary",
+          variant: "destructive",
+        })
       }
     }
 
@@ -321,31 +198,104 @@ const Reports = () => {
   }
 
   const handleGenerateReport = async () => {
-    setIsGenerating(true)
-    try {
-      // Simulate report generation
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      const newReport: ReportData = {
-        id: Date.now().toString(),
-        name: `${selectedReportType.charAt(0).toUpperCase() + selectedReportType.slice(1)} Report - ${format(new Date(), 'yyyy-MM-dd')}`,
-        type: selectedReportType as any,
-        format: selectedFormat as any,
-        generatedAt: new Date().toISOString(),
-        size: '1.2 MB',
-        status: 'completed'
-      }
-      
-      setReports(prev => [newReport, ...prev])
-      
+    if (selectedReportType === 'custom' && (!dateRange.from || !dateRange.to)) {
       toast({
-        title: "Report Generated",
-        description: `${selectedReportType} report has been generated successfully.`,
+        title: "Error",
+        description: "Please select a date range for custom reports",
+        variant: "destructive",
       })
+      return
+    }
+
+    setIsGenerating(true)
+    
+    try {
+      // Generate report name
+      const reportName = `${selectedReportType.charAt(0).toUpperCase() + selectedReportType.slice(1)} Report - ${format(new Date(), 'yyyy-MM-dd')}`
+      
+      // Create new report using the generate endpoint
+      const generateResult = await apiClient.generateNewReport({
+        name: reportName,
+        type: selectedReportType,
+        format: selectedFormat,
+        includeJobs: true,
+        includeRepositories: true,
+        includeAlerts: true,
+      })
+
+      if (generateResult.success && generateResult.data) {
+        // Add the new report to the local state
+        setReports(prev => [generateResult.data, ...prev])
+
+        // Generate the actual report content for download/preview
+        const startDate = selectedReportType === 'custom' && dateRange.from 
+          ? dateRange.from.toISOString().split('T')[0]
+          : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+        const endDate = selectedReportType === 'custom' && dateRange.to
+          ? dateRange.to.toISOString().split('T')[0]
+          : new Date().toISOString().split('T')[0]
+
+        const contentResult = await apiClient.generateReport({
+          type: 'detailed',
+          format: selectedFormat as 'html' | 'pdf' | 'csv',
+          startDate,
+          endDate,
+          includeJobs: true,
+          includeRepositories: true,
+          includeAlerts: true,
+        })
+
+        if (contentResult.success && contentResult.data) {
+          // Handle different formats
+          if (selectedFormat === 'csv') {
+            // Create CSV blob and download
+            const blob = new Blob([contentResult.data], { type: 'text/csv' })
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `${reportName}.csv`
+            document.body.appendChild(a)
+            a.click()
+            window.URL.revokeObjectURL(url)
+            document.body.removeChild(a)
+          } else if (selectedFormat === 'pdf') {
+            // Handle PDF download (assuming base64 response)
+            const binaryString = atob(contentResult.data)
+            const bytes = new Uint8Array(binaryString.length)
+            for (let i = 0; i < binaryString.length; i++) {
+              bytes[i] = binaryString.charCodeAt(i)
+            }
+            const blob = new Blob([bytes], { type: 'application/pdf' })
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `${reportName}.pdf`
+            document.body.appendChild(a)
+            a.click()
+            window.URL.revokeObjectURL(url)
+            document.body.removeChild(a)
+          } else {
+            // HTML format - open in new window
+            const newWindow = window.open('', '_blank')
+            if (newWindow) {
+              newWindow.document.write(contentResult.data)
+              newWindow.document.close()
+            }
+          }
+        }
+
+        toast({
+          title: "Success",
+          description: `${selectedReportType.charAt(0).toUpperCase() + selectedReportType.slice(1)} report generated successfully`,
+        })
+      } else {
+        throw new Error(generateResult.error || 'Failed to generate report')
+      }
     } catch (error) {
+      console.error('Error generating report:', error)
       toast({
-        title: "Generation Failed",
-        description: "Failed to generate report. Please try again.",
+        title: "Error",
+        description: "Failed to generate report",
         variant: "destructive",
       })
     } finally {
@@ -486,11 +436,14 @@ const Reports = () => {
       })
 
       // Send the report via WhatsApp
-      const recipients = whatsappSettings.data.defaultRecipients.split(',').map((r: string) => r.trim())
+      const recipients = Array.isArray(whatsappSettings.data.defaultRecipients) 
+        ? whatsappSettings.data.defaultRecipients 
+        : whatsappSettings.data.defaultRecipients.split(',').map((r: string) => r.trim())
       const result = await apiClient.sendWhatsAppReport({
         recipients,
         format: 'summary',
         reportType: report.type as 'daily' | 'weekly' | 'monthly',
+        useImageReport: false, // Default to text report for historical reports
       })
 
       if (result.success) {
@@ -508,6 +461,54 @@ const Reports = () => {
         description: error.message || "Failed to send report via WhatsApp. Please try again.",
         variant: "destructive",
       })
+    }
+  }
+
+  const handlePreviewReport = async () => {
+    setIsGeneratingPreview(true)
+    
+    try {
+      toast({
+        title: "Generating Preview",
+        description: "Creating report preview...",
+      })
+
+      const startDate = selectedReportType === 'custom' && dateRange.from 
+        ? dateRange.from.toISOString().split('T')[0]
+        : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      const endDate = selectedReportType === 'custom' && dateRange.to
+        ? dateRange.to.toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0]
+
+      const result = await apiClient.previewReport({
+        type: 'summary',
+        startDate,
+        endDate,
+        includeJobs: true,
+        includeRepositories: true,
+        includeAlerts: true,
+      })
+
+      if (result.success && result.data) {
+        setPreviewContent(result.data)
+        setPreviewModalOpen(true)
+        
+        toast({
+          title: "Preview Generated",
+          description: "Report preview is ready.",
+        })
+      } else {
+        throw new Error(result.error || 'Failed to generate preview')
+      }
+    } catch (error: any) {
+      console.error('Preview generation failed:', error)
+      toast({
+        title: "Preview Failed",
+        description: error.message || "Failed to generate report preview.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsGeneratingPreview(false)
     }
   }
 
@@ -661,11 +662,29 @@ const Reports = () => {
                     )}
                   </div>
                 </CardContent>
-                <CardFooter>
+                <CardFooter className="flex flex-wrap gap-2">
+                  <Button 
+                    onClick={handlePreviewReport} 
+                    disabled={isGeneratingPreview}
+                    variant="outline"
+                    className="flex-1 min-w-[140px]"
+                  >
+                    {isGeneratingPreview ? (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                        Previewing...
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="mr-2 h-4 w-4" />
+                        Preview Report
+                      </>
+                    )}
+                  </Button>
                   <Button 
                     onClick={handleGenerateReport} 
                     disabled={isGenerating}
-                    className="w-full md:w-auto"
+                    className="flex-1 min-w-[140px]"
                   >
                     {isGenerating ? (
                       <>
@@ -854,6 +873,24 @@ const Reports = () => {
           </Tabs>
         </div>
       </main>
+
+      {/* Preview Modal */}
+      <Dialog open={previewModalOpen} onOpenChange={setPreviewModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle>Report Preview</DialogTitle>
+            <DialogDescription>
+              Preview of the generated report content
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto border rounded-md p-4 bg-white min-h-0">
+            <div 
+              dangerouslySetInnerHTML={{ __html: previewContent }}
+              className="prose prose-sm max-w-none"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
