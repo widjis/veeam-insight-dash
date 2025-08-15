@@ -18,12 +18,14 @@ import veeamRoutes from '@/routes/veeam.js';
 import authRoutes from '@/routes/auth.js';
 import dashboardRoutes, { setServices } from '@/routes/dashboard.js';
 import settingsRoutes from '@/routes/settings.js';
+import databaseRoutes from '@/routes/database.js';
 import { VeeamService } from '@/services/VeeamService.js';
 import { MockVeeamService } from '@/services/MockVeeamService.js';
 import { WebSocketService } from '@/services/WebSocketService.js';
 import { CacheService } from '@/services/CacheService.js';
 import { AlertService } from '@/services/AlertService.js';
 import { MonitoringService } from '@/services/MonitoringService.js';
+import { initializeDatabase, checkDatabaseHealth } from '@/services/database.js';
 
 // Get current directory in ES module
 const __filename = fileURLToPath(import.meta.url);
@@ -108,6 +110,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/veeam', authMiddleware, veeamRoutes);
 app.use('/api/dashboard', authMiddleware, dashboardRoutes);
 app.use('/api/settings', authMiddleware, settingsRoutes);
+app.use('/api/database', databaseRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -136,6 +139,20 @@ const monitoringService = new MonitoringService(veeamService, wsService, cacheSe
 
 // Set services for dashboard routes
 setServices(alertService, monitoringService);
+
+// Initialize database connection
+try {
+  await initializeDatabase();
+  const dbHealthy = await checkDatabaseHealth();
+  if (dbHealthy) {
+    logger.info('Database connection established successfully');
+  } else {
+    logger.warn('Database health check failed');
+  }
+} catch (error) {
+  logger.error('Failed to initialize database:', error);
+  logger.warn('Application will continue with environment variable fallback');
+}
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {

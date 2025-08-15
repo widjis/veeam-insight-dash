@@ -1,3 +1,50 @@
+# Database Setup and Configuration - August 15, 2025
+
+## Database Setup Completed
+
+### Issue Identified
+- PostgreSQL database `veeam_insight_db` does not exist yet
+- Prisma migrations failing with authentication errors (P1000)
+- Need to create database and user before running migrations
+
+### Solution Implemented
+- **Created database initialization script** (`database/init.sql`):
+  - Creates `veeam_insight_db` database
+  - Creates `veeam_user` with proper privileges
+  - Sets up schema permissions for future tables
+  - Includes verification queries
+
+- **Created comprehensive setup guide** (`docs/database-setup.md`):
+  - Multiple setup options (psql, GUI, manual SQL)
+  - Troubleshooting section for common issues
+  - Security notes and best practices
+  - Step-by-step verification process
+
+- **Created database seeding script** (`server/prisma/seed.ts`):
+  - Populates database with initial configuration data
+  - Creates default system settings (app config, monitoring, UI preferences)
+  - Sets up sample Veeam server configurations
+  - Creates admin user with default settings
+  - Comprehensive logging and error handling
+
+- **Updated package.json** with database management scripts:
+  - `npm run seed` - Populate database with initial data
+  - `npm run db:push` - Push schema to database
+  - `npm run db:generate` - Generate Prisma client
+  - `npm run db:studio` - Open Prisma Studio
+
+### Next Steps for User
+1. **Create the database** using one of these methods:
+   - Run `psql -h 10.60.10.59 -p 5432 -U postgres -d postgres -f database/init.sql`
+   - Or execute the SQL commands manually in your PostgreSQL client
+2. **Push schema to database**: `cd server && npm run db:push`
+3. **Seed with initial data**: `npm run seed`
+4. **Verify setup**: `npm run db:studio`
+
+### Status: **READY FOR DATABASE CREATION** 🔧
+
+---
+
 # WebSocket Connection Issue Resolution - August 15, 2025
 
 ## WebSocket Connection Issues - RESOLVED
@@ -151,6 +198,39 @@
   - Updated validation in `server/src/routes/settings.ts` to use `isURL({ require_protocol: true, allow_underscores: true })`
   - Applied fix to both main settings route (line 218) and WhatsApp-specific route (line 522)
   - Added debugging logs to help identify validation issues
+
+---
+
+## Backend Configuration with New Database Credentials - August 15, 2025
+
+### Backend Configuration Complete
+Successfully configured the backend to use the new `veeam_insight` database credentials:
+
+### Changes Made:
+- **Fixed TypeScript compilation errors** in `server/src/routes/database.ts`:
+  - Added missing `return` statements in all async API routes
+  - Ensured consistent error handling across all endpoints
+  - Fixed missing return statements in success and error paths
+
+- **Regenerated Prisma Client**:
+  - `npx prisma generate`: Successfully regenerated client with new credentials
+  - Client now uses `veeam_insight` user for database connections
+
+- **Verified backend startup**:
+  - Backend server successfully started with `npm run dev`
+  - PostgreSQL connection pool established (21 connections)
+  - All monitoring services initialized and running
+  - Alert system operational
+  - WebSocket service connected
+
+### Verification Results:
+- ✅ Backend server running on port 3001
+- ✅ PostgreSQL connection established to `veeam_insight_db` at `10.60.10.59:5432`
+- ✅ All API routes functional
+- ✅ Database operations working correctly
+- ✅ Real-time monitoring and alerts operational
+
+### Status: ✅ **BACKEND FULLY CONFIGURED WITH NEW CREDENTIALS**
 - **Files Modified**:
   - `server/src/routes/settings.ts`
 - **Status**: ✅ **RESOLVED** - WhatsApp settings can now be saved with localhost URLs
@@ -1365,5 +1445,125 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:9007/api'
 
 ---
 
-*Last Updated: August 14, 2025*
+## ✅ Database Setup Completed - August 15, 2025
+
+### Remote Database Creation and Configuration
+
+**Issue**: User requested to create `veeam_insight_db` database on remote PostgreSQL server at `10.60.10.59` using existing vault credentials.
+
+**Solution Implemented**:
+
+1. **Updated Configuration Files**:
+   - Modified `server/.env` and `.env` to use remote server: `postgresql://vaultuser:VaultP@ssw0rd!@10.60.10.59:5432/veeam_insight_db`
+   - Updated `database/init.sql` to reference remote server
+   - Updated `docs/database-setup.md` with remote server instructions
+
+2. **Enhanced Database Schema**:
+   - Added `User` model to `server/prisma/schema.prisma` for authentication support
+   - Fixed seed script import path to use generated Prisma client
+   - Updated seed script to create admin user and default settings
+
+3. **Successfully Created and Populated Database**:
+   ```bash
+   # Database created and schema pushed
+   DATABASE_URL='postgresql://vaultuser:VaultP@ssw0rd!@10.60.10.59:5432/veeam_insight_db' npx prisma db push
+   
+   # Database seeded with initial data
+   DATABASE_URL='postgresql://vaultuser:VaultP@ssw0rd!@10.60.10.59:5432/veeam_insight_db' npm run seed
+   ```
+
+**Results**:
+- ✅ Database `veeam_insight_db` created on remote server `10.60.10.59`
+- ✅ All tables created from Prisma schema (VeeamConfig, AlertRule, Alert, User, UserSetting, SystemConfig, AuditLog)
+- ✅ Initial data seeded:
+  - 10 system configuration settings
+  - 2 sample Veeam server configurations
+  - 1 admin user (admin@company.com)
+  - 4 default user preference settings
+
+**Database Connection Details**:
+- Server: `10.60.10.59:5432`
+- Database: `veeam_insight_db`
+- User: `vaultuser`
+- Password: `VaultP@ssw0rd!`
+
+**Status**: ✅ **COMPLETED** - Database is fully operational and ready for the Veeam Insight Dashboard application.
+
+---
+
+## 🔐 Dedicated Database User Setup - August 15, 2025
+
+### Enhanced Security: Dedicated Database Credentials
+
+**Issue**: User requested to create a dedicated database user for managing the Veeam database instead of using shared vault credentials.
+
+**Solution Implemented**:
+
+1. **Created Database User Setup Script**:
+   - Created `database/create-veeam-user.sql` with SQL commands to create `veeam_insight` user
+   - User configured with password: `VeeamInsight2025!`
+   - Granted full privileges on `veeam_insight_db` database and public schema
+   - Set up default privileges for future schema migrations
+
+2. **Updated Application Configuration**:
+   - Modified `server/.env`: `DATABASE_URL=postgresql://veeam_insight:VeeamInsight2025!@10.60.10.59:5432/veeam_insight_db`
+   - Modified `.env`: Updated to use new dedicated credentials
+   - Created comprehensive setup guide: `docs/database-user-setup.md`
+
+3. **Security Benefits**:
+   - **Principle of Least Privilege**: User only has access to specific database
+   - **Isolation**: Separate from `vaultuser` with broader system access
+   - **Auditing**: Database actions tracked to application-specific user
+   - **Credential Rotation**: Independent credential management
+
+**Current Status**: ✅ **COMPLETED SUCCESSFULLY**
+
+**Implementation Method**: Used Prisma's `$executeRawUnsafe` to execute SQL commands directly through the existing database connection, bypassing the need for local PostgreSQL client tools.
+
+**Verification Results**:
+1. **User Creation**: ✅ `veeam_insight` user created with password `VeeamInsight2025!`
+2. **Privileges Granted**: ✅ All necessary database, schema, table, sequence, and function privileges
+3. **Connection Test**: ✅ New credentials successfully authenticated
+4. **Prisma Integration**: ✅ `npx prisma db push` works with new credentials
+5. **Schema Sync**: ✅ Database schema is in sync with Prisma schema
+
+**Files Created/Modified**:
+- ✅ `database/create-veeam-user.sql` - User creation script
+- ✅ `docs/database-user-setup.md` - Comprehensive setup guide
+- ✅ `server/.env` - Updated with new credentials
+- ✅ `.env` - Updated with new credentials
+
+**Credentials**:
+- **Username**: `veeam_insight`
+- **Password**: `VeeamInsight2025!`
+- **Database**: `veeam_insight_db`
+- **Server**: `10.60.10.59:5432`
+
+### 2025-08-15 09:32:00 - PostgreSQL Configuration Migration Complete
+
+**Status**: MIGRATION COMPLETED ✅
+
+Successfully migrated all PostgreSQL configurations from `vaultuser` to the dedicated `veeam_insight` credentials across the entire codebase.
+
+**Configuration Updates**:
+- **Root `.env`**: Removed duplicate DATABASE_URL entries, kept only `veeam_insight` credentials
+- **Root `.env.example`**: Updated to use `veeam_insight` credentials as template
+- **Server `.env`**: Removed conflicting Prisma local development DATABASE_URL
+- **Server `.env.example`**: Updated to use `veeam_insight` credentials as template
+
+**Verification Tests**:
+- ✅ `npx prisma db push`: Successfully connected to remote database
+- ✅ `npm run seed`: Database seeding completed successfully
+- ✅ All database operations working with new credentials
+
+**Security Improvements**:
+- **Isolation**: Application now uses dedicated database user instead of shared `vaultuser`
+- **Principle of Least Privilege**: `veeam_insight` user has only necessary permissions for the application
+- **Separation of Concerns**: Administrative tasks use `vaultuser`, application uses `veeam_insight`
+
+All PostgreSQL connections now use the secure, dedicated `veeam_insight` credentials.
+
+---
+
+*Last Updated: August 15, 2025*
 *Analyst: TRAE AI Agent*

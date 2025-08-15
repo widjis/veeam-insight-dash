@@ -135,6 +135,25 @@ model Alert {
 // USER AND SYSTEM CONFIGURATION MODELS
 // ============================================================================
 
+// User authentication and management
+model User {
+  id              String   @id @default(cuid())
+  email           String   @unique
+  username        String   @unique
+  firstName       String
+  lastName        String
+  passwordHash    String
+  role            String   @default("user") // admin, user, viewer
+  isActive        Boolean  @default(true)
+  lastLoginAt     DateTime?
+  
+  // Metadata
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("users")
+}
+
 // User settings and preferences
 model UserSetting {
   id              String   @id @default(cuid())
